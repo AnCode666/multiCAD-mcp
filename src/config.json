@@ -1,0 +1,35 @@
+{
+  "debug": false,
+  "logging_level": "DEBUG",
+  "cad": {
+    "autocad": {
+      "type": "AUTOCAD",
+      "prog_id": "AutoCAD.Application",
+      "startup_wait_time": 20.0
+    },
+    "zwcad": {
+      "type": "ZWCAD",
+      "prog_id": "ZWCAD.Application",
+      "startup_wait_time": 15.0
+    },
+    "gcad": {
+      "type": "GCAD",
+      "prog_id": "GCAD.Application",
+      "startup_wait_time": 15.0
+    },
+    "bricscad": {
+      "type": "BRICSCAD",
+      "prog_id": "BricscadApp.AcadApplication",
+      "startup_wait_time": 15.0
+    }
+  },
+  "output": {
+    "directory": "~/Documents/multiCAD Exports",
+    "format": "dwg"
+  },
+  "nlp": {
+    "default_language": "en",
+    "supported_languages": ["en", "es"],
+    "strict_mode": false
+  }
+}

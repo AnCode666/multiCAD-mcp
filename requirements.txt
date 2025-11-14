@@ -1,0 +1,25 @@
+# multiCAD-MCP Dependencies
+
+# MCP Framework (FastMCP 2.0 - modern implementation)
+mcp>=1.2.0
+
+# Windows COM Interface
+pywin32>=300
+
+# Excel export
+openpyxl>=3.1.0
+
+# Python 3.10+ type hints and utilities
+typing-extensions>=4.5.0
+
+# Development/Testing (optional, for tests)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-asyncio>=0.20.0
+
+# Code Quality (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+isort>=5.12.0
+

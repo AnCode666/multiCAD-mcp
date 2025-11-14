@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Logging
+multicad_mcp.log
+
+
+# Local configuration
+config.local.json
+.env
+
+# OS
+Thumbs.db
+.DS_Store
