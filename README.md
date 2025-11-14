@@ -67,14 +67,16 @@ Add this to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "multiCAD": {
-      "command": "py",
+      "command": "C:\\path\\to\\multiCAD-mcp\\.venv\\Scripts\\python.exe",
       "args": ["C:\\path\\to\\multiCAD-mcp\\src\\server.py"]
     }
   }
 }
 ```
 
-Replace `C:\\path\\to\\multiCAD-mcp` with your actual installation path.
+**Important**: Use the full path to the Python interpreter in your virtual environment (`.venv\Scripts\python.exe`), not the system `py` command. This ensures Claude Desktop uses the correct Python environment with all required dependencies installed.
+
+Replace `C:\path\to\multiCAD-mcp` with your actual installation path.
 
 ## Usage Examples
 

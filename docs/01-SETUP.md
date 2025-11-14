@@ -59,6 +59,38 @@ py src/server.py
 npx -y @modelcontextprotocol/inspector py src/server.py
 ```
 
+## Claude Desktop Integration
+
+### Configuration
+
+To use multiCAD-mcp with Claude Desktop, add it to your `claude_desktop_config.json` (located at `%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "multiCAD": {
+      "command": "C:\\path\\to\\multiCAD-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\multiCAD-mcp\\src\\server.py"]
+    }
+  }
+}
+```
+
+**Important**: Use the full path to the Python interpreter in your virtual environment (`.venv\Scripts\python.exe`), **not** the system `py` command. This ensures Claude Desktop uses the correct Python environment with all required dependencies installed.
+
+### Troubleshooting Claude Desktop Connection
+
+**Error**: "Cannot read properties of undefined (reading 'cmd')"
+
+- **Cause**: Claude Desktop is using the wrong Python interpreter (system Python without dependencies)
+- **Solution**: Use the full path to your venv's Python executable (see configuration above)
+
+**Error**: "Connection failed" or server not responding
+
+- Ensure the path to `.venv\Scripts\python.exe` is correct
+- Restart Claude Desktop after updating the configuration
+- Check logs in `logs/multicad_mcp.log` for detailed error messages
+
 ## Project Structure
 
 ```text
