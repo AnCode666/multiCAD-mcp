@@ -1,0 +1,29 @@
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Initializing server 'multiCAD-MCP'
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for ListToolsRequest
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for CallToolRequest
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for ListResourcesRequest
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for ReadResourceRequest
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for PromptListRequest
+2025-11-14 20:53:34,135 - mcp.server.lowlevel.server - DEBUG - Registering handler for GetPromptRequest
+2025-11-14 20:53:34,136 - mcp.server.lowlevel.server - DEBUG - Registering handler for ListResourceTemplatesRequest
+2025-11-14 20:53:34,136 - mcp_tools.helpers - INFO - Registering MCP tools...
+2025-11-14 20:53:34,139 - mcp_tools.helpers - DEBUG -   ✓ Connection tools registered
+2025-11-14 20:53:34,149 - mcp_tools.helpers - DEBUG -   ✓ Drawing tools registered
+2025-11-14 20:53:34,156 - mcp_tools.helpers - DEBUG -   ✓ Layer tools registered
+2025-11-14 20:53:34,163 - mcp_tools.helpers - DEBUG -   ✓ File tools registered
+2025-11-14 20:53:34,174 - mcp_tools.helpers - DEBUG -   ✓ Entity tools registered
+2025-11-14 20:53:34,177 - mcp_tools.helpers - DEBUG -   ✓ Simple tools registered
+2025-11-14 20:53:34,178 - mcp_tools.helpers - DEBUG -   ✓ NLP tools registered
+2025-11-14 20:53:34,181 - mcp_tools.helpers - DEBUG -   ✓ Export tools registered
+2025-11-14 20:53:34,184 - mcp_tools.helpers - DEBUG -   ✓ Debug tools registered
+2025-11-14 20:53:34,185 - mcp_tools.helpers - INFO - All MCP tools registered successfully
+2025-11-14 20:53:34,185 - mcp_tools.helpers - INFO - Starting multiCAD-MCP server v0.1.0...
+2025-11-14 20:53:34,185 - mcp_tools.helpers - INFO - Supported CAD types: autocad, zwcad, gcad, bricscad
+2025-11-14 20:53:34,185 - mcp_tools.helpers - INFO - Auto-detecting CAD applications...
+2025-11-14 20:53:34,186 - mcp_tools.adapter_manager - INFO - Auto-detecting zwcad...
+2025-11-14 20:53:34,186 - adapters.autocad_adapter - INFO - Connecting to zwcad...
+2025-11-14 20:53:34,198 - adapters.autocad_adapter - INFO - zwcad instance found (active)
+2025-11-14 20:53:34,223 - adapters.autocad_adapter - INFO - Using existing active document
+2025-11-14 20:53:34,225 - adapters.autocad_adapter - INFO - ✓ Successfully connected to zwcad
+2025-11-14 20:53:34,226 - mcp_tools.adapter_manager - INFO - Auto-detected: zwcad is available and active
+2025-11-14 20:53:34,226 - mcp_tools.helpers - INFO - Starting MCP server loop...
