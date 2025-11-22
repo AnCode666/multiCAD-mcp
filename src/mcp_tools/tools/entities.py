@@ -5,9 +5,10 @@ Provides tools for:
 - Selecting entities by color, layer, or type
 - Moving, rotating, and scaling entities
 - Copying and pasting entities
-- Changing entity properties (color, layer)
+- Changing entity properties with batch operations (color, layer)
 """
 
+import json
 import logging
 from typing import Optional
 
@@ -243,7 +244,7 @@ def register_entity_tools(mcp):
         cad_type: Optional[str] = None,
     ) -> str:
         """
-        Change color of entities.
+        Change color of entities (all to same color).
 
         Args:
             handles: Comma-separated entity handles
@@ -261,6 +262,81 @@ def register_entity_tools(mcp):
         else:
             return "Failed to change entity color"
 
+    @cad_tool(mcp, "change_entities_colors")
+    def change_entities_colors(
+        ctx: Context,
+        color_changes: str,
+        cad_type: Optional[str] = None,
+    ) -> str:
+        """
+        Change color of multiple entities with individual colors.
+
+        Args:
+            color_changes: JSON array of color change specifications.
+                          Example: [{"handles": "h1,h2,h3", "color": "red"}, {"handles": "h4,h5", "color": "blue"}]
+                          Fields: handles (required, comma-separated), color (required)
+            cad_type: CAD application to use
+
+        Returns:
+            JSON result with operation status
+        """
+        try:
+            changes_data = (
+                json.loads(color_changes)
+                if isinstance(color_changes, str)
+                else color_changes
+            )
+            if not isinstance(changes_data, list):
+                changes_data = [changes_data]
+
+            results = []
+            total_changed = 0
+
+            for i, change_spec in enumerate(changes_data):
+                try:
+                    handles_str = change_spec["handles"]
+                    color = change_spec["color"]
+                    handle_list = parse_handles(handles_str)
+
+                    success = get_current_adapter().change_entity_color(
+                        handle_list, color
+                    )
+                    changed = len(handle_list) if success else 0
+                    total_changed += changed
+
+                    results.append(
+                        {
+                            "index": i,
+                            "handles": handles_str,
+                            "color": color,
+                            "count": len(handle_list),
+                            "success": success,
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error changing color in operation {i}: {e}")
+                    results.append({"index": i, "success": False, "error": str(e)})
+
+            return json.dumps(
+                {
+                    "total_changes": len(changes_data),
+                    "total_changed": total_changed,
+                    "results": results,
+                },
+                indent=2,
+            )
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"Invalid JSON input: {str(e)}",
+                    "total_changes": 0,
+                    "total_changed": 0,
+                    "results": [],
+                },
+                indent=2,
+            )
+
     @cad_tool(mcp, "change_entity_layer")
     def change_entity_layer(
         ctx: Context,
@@ -269,7 +345,7 @@ def register_entity_tools(mcp):
         cad_type: Optional[str] = None,
     ) -> str:
         """
-        Move entities to a different layer.
+        Move entities to a different layer (all to same layer).
 
         Args:
             handles: Comma-separated entity handles
@@ -286,3 +362,78 @@ def register_entity_tools(mcp):
             return f"Moved {len(handle_list)} entities to layer '{layer_name}'"
         else:
             return "Failed to change entity layer"
+
+    @cad_tool(mcp, "change_entities_layers")
+    def change_entities_layers(
+        ctx: Context,
+        layer_changes: str,
+        cad_type: Optional[str] = None,
+    ) -> str:
+        """
+        Move multiple entities to different layers with individual assignments.
+
+        Args:
+            layer_changes: JSON array of layer change specifications.
+                          Example: [{"handles": "h1,h2,h3", "layer_name": "Layer1"}, {"handles": "h4,h5", "layer_name": "Layer2"}]
+                          Fields: handles (required, comma-separated), layer_name (required)
+            cad_type: CAD application to use
+
+        Returns:
+            JSON result with operation status
+        """
+        try:
+            changes_data = (
+                json.loads(layer_changes)
+                if isinstance(layer_changes, str)
+                else layer_changes
+            )
+            if not isinstance(changes_data, list):
+                changes_data = [changes_data]
+
+            results = []
+            total_moved = 0
+
+            for i, change_spec in enumerate(changes_data):
+                try:
+                    handles_str = change_spec["handles"]
+                    layer_name = change_spec["layer_name"]
+                    handle_list = parse_handles(handles_str)
+
+                    success = get_current_adapter().change_entity_layer(
+                        handle_list, layer_name
+                    )
+                    moved = len(handle_list) if success else 0
+                    total_moved += moved
+
+                    results.append(
+                        {
+                            "index": i,
+                            "handles": handles_str,
+                            "layer_name": layer_name,
+                            "count": len(handle_list),
+                            "success": success,
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error changing layer in operation {i}: {e}")
+                    results.append({"index": i, "success": False, "error": str(e)})
+
+            return json.dumps(
+                {
+                    "total_changes": len(changes_data),
+                    "total_moved": total_moved,
+                    "results": results,
+                },
+                indent=2,
+            )
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"Invalid JSON input: {str(e)}",
+                    "total_changes": 0,
+                    "total_moved": 0,
+                    "results": [],
+                },
+                indent=2,
+            )

@@ -188,7 +188,7 @@ black src/
 PYTHONPATH=src py -m server
 ```
 
-## Configuration
+## Project Configuration
 
 ### Runtime Configuration
 

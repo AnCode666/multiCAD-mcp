@@ -5,7 +5,11 @@ Tests adapter factory and interface implementation.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.adapters import get_adapter, create_adapter, ADAPTER_REGISTRY
+from src.adapters import (
+    get_adapter,
+    create_adapter,
+    ADAPTER_REGISTRY,
+)
 from src.core import CADInterface
 
 
@@ -63,7 +67,7 @@ class TestAdapterCreation:
         try:
             adapter1 = create_adapter("autocad")
             adapter2 = create_adapter("AUTOCAD")
-            assert type(adapter1) == type(adapter2)
+            assert isinstance(adapter1, type(adapter2))
         except Exception:
             # Expected to fail if CAD not installed
             pass
@@ -156,13 +160,12 @@ class TestCoordinateNormalization:
     def test_normalize_coordinate_invalid_raises(self):
         """Test invalid coordinate raises error."""
         with pytest.raises(ValueError):
-            CADInterface.normalize_coordinate((10,))  # Only 1 dimension # type: ignore
+            # Only 1 dimension - type: ignore
+            CADInterface.normalize_coordinate((10,))  # type: ignore
 
         with pytest.raises(ValueError):
-            CADInterface.normalize_coordinate(
-                (10, 20, 30, 40) # type: ignore
-            )  # Too many 
-
+            # Too many dimensions - type: ignore
+            CADInterface.normalize_coordinate((10, 20, 30, 40))  # type: ignore
 
 class TestLineWeightValidation:
     """Test suite for lineweight validation."""
