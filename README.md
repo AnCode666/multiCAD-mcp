@@ -89,6 +89,7 @@ multiCAD-mcp provides **47 MCP tools** with batch operation support for efficien
 #### Drawing (8 tools - 7 batch optimized)
 
 **Batch Operations** (recommended for multiple items):
+
 - **draw_lines**: Draw multiple lines in one call
 - **draw_circles**: Draw multiple circles in one call
 - **draw_arcs**: Draw multiple arcs in one call
@@ -98,15 +99,18 @@ multiCAD-mcp provides **47 MCP tools** with batch operation support for efficien
 - **add_dimensions**: Add multiple dimensions in one call
 
 **Helper Tools**:
+
 - **draw_circle_and_line**: Draw circle and tangent line
 
 #### Entity Operations (12 tools)
 
 **Batch Operations** (for color/layer changes):
+
 - **change_entities_colors**: Change colors of multiple entity groups
 - **change_entities_layers**: Move multiple entity groups to different layers
 
 **Standard Operations**:
+
 - **select_by_color/layer/type**: Select entities by criteria
 - **move_entities**: Move selected entities
 - **rotate_entities**: Rotate entities around a point
@@ -118,12 +122,14 @@ multiCAD-mcp provides **47 MCP tools** with batch operation support for efficien
 #### Layer Management (7 tools - 4 batch optimized)
 
 **Batch Operations** (recommended for multiple layers):
+
 - **rename_layers**: Rename multiple layers in one call
 - **delete_layers**: Delete multiple layers in one call
 - **turn_layers_on**: Show multiple layers in one call
 - **turn_layers_off**: Hide multiple layers in one call
 
 **Standard Operations**:
+
 - **create_layer**: Create new layers
 - **list_layers**: List all layers
 - **is_layer_on**: Check layer visibility status
@@ -158,6 +164,7 @@ New batch operation tools reduce API calls by **60-70%** when working with multi
 #### Example: Drawing Multiple Shapes
 
 Instead of 10 separate calls:
+
 ```json
 draw_lines('[
   {"start": "0,0", "end": "10,10", "color": "red"},
@@ -178,6 +185,7 @@ turn_layers_off('["Reference", "Hidden", "Notes"]')
 ```
 
 **Benefits**:
+
 - Single API call for multiple operations
 - Detailed per-item error reporting
 - Structured JSON responses
