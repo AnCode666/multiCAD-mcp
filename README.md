@@ -9,6 +9,8 @@ multiCAD-mcp is an MCP server that lets you control your CAD software using AI a
 ## Features
 
 - **Multiple CAD Support**: Works with AutoCAD®, ZWCAD®, GstarCAD®, and BricsCAD®
+- **47 MCP Tools**: Comprehensive set of drawing, layer, entity, and file management tools
+- **Batch Operations** (v0.1.1+): 60-70% fewer API calls when managing multiple items
 - **Simple command execution**: "Draw a red circle at 50,50 with radius 25" - no complex syntax needed
 - **Complex tasks execution**: "Draw the graph of y = sen(X) and label the axes"
 - **Simple Integration**: Works with Claude, Cursor, VS Code, and any MCP-compatible client
@@ -82,36 +84,48 @@ Replace `C:\path\to\multiCAD-mcp` with your actual installation path.
 
 ### Direct Tool Calls
 
-The primary way to use multiCAD-mcp is through direct tool calls:
+multiCAD-mcp provides **47 MCP tools** with batch operation support for efficiency:
 
-#### Drawing (8 tools)
+#### Drawing (8 tools - 7 batch optimized)
 
-- **draw_line**: Draw lines between two points
-- **draw_circle**: Draw circles with radius
-- **draw_arc**: Draw arcs with angles
-- **draw_rectangle**: Draw rectangles
-- **draw_polyline**: Draw connected lines
+**Batch Operations** (recommended for multiple items):
+- **draw_lines**: Draw multiple lines in one call
+- **draw_circles**: Draw multiple circles in one call
+- **draw_arcs**: Draw multiple arcs in one call
+- **draw_rectangles**: Draw multiple rectangles in one call
+- **draw_polylines**: Draw multiple polylines in one call
+- **draw_texts**: Add multiple text labels in one call
+- **add_dimensions**: Add multiple dimensions in one call
+
+**Helper Tools**:
 - **draw_circle_and_line**: Draw circle and tangent line
-- **draw_text**: Add text annotations
-- **add_dimension**: Add dimension annotations
 
-#### Entity Operations (10 tools)
+#### Entity Operations (12 tools)
 
+**Batch Operations** (for color/layer changes):
+- **change_entities_colors**: Change colors of multiple entity groups
+- **change_entities_layers**: Move multiple entity groups to different layers
+
+**Standard Operations**:
 - **select_by_color/layer/type**: Select entities by criteria
 - **move_entities**: Move selected entities
 - **rotate_entities**: Rotate entities around a point
 - **scale_entities**: Scale entities by factor
 - **copy_entities**: Copy entities to clipboard
 - **paste_entities**: Paste from clipboard
-- **change_entity_color/layer**: Modify entity properties
+- **change_entity_color/layer**: Modify single entity properties
 
-#### Layer Management (7 tools)
+#### Layer Management (7 tools - 4 batch optimized)
 
+**Batch Operations** (recommended for multiple layers):
+- **rename_layers**: Rename multiple layers in one call
+- **delete_layers**: Delete multiple layers in one call
+- **turn_layers_on**: Show multiple layers in one call
+- **turn_layers_off**: Hide multiple layers in one call
+
+**Standard Operations**:
 - **create_layer**: Create new layers
 - **list_layers**: List all layers
-- **rename_layer**: Rename existing layer
-- **delete_layer**: Remove layers
-- **turn_layer_on/off**: Toggle layer visibility
 - **is_layer_on**: Check layer visibility status
 
 #### File Operations (5 tools)
@@ -137,13 +151,45 @@ The primary way to use multiCAD-mcp is through direct tool calls:
 - **get_server_info/get_mcp_config**: Server diagnostics
 - **execute_natural_command**: Natural language fallback
 
-### Complex tasks that require multiple Tool Calls
+### Batch Operations (v0.1.1+)
 
-You can also ask you AI assistant to execute complex tasks, that require the use of several drawing tools:
+New batch operation tools reduce API calls by **60-70%** when working with multiple items:
 
-- **Draw the graphic of a ecuation**: Fast and accurate drawing of complex shapes
+#### Example: Drawing Multiple Shapes
+
+Instead of 10 separate calls:
+```json
+draw_lines('[
+  {"start": "0,0", "end": "10,10", "color": "red"},
+  {"start": "20,20", "end": "30,30", "color": "blue"},
+  {"start": "40,40", "end": "50,50", "color": "green"}
+]')
+```
+
+#### Example: Managing Multiple Layers
+
+```json
+rename_layers('[
+  {"old_name": "Layer1", "new_name": "Primary"},
+  {"old_name": "Layer2", "new_name": "Secondary"}
+]')
+
+turn_layers_off('["Reference", "Hidden", "Notes"]')
+```
+
+**Benefits**:
+- Single API call for multiple operations
+- Detailed per-item error reporting
+- Structured JSON responses
+- Faster execution and lower token usage
+
+### Complex Tasks
+
+You can also ask your AI assistant to execute complex tasks that require multiple drawing tools:
+
+- **Draw the graphic of an equation**: Fast and accurate drawing of complex shapes
 - **Draw a title block**: Automate drawing layout related tasks
-- **Draw a table with some data"**: Automate the creation of data tables in drawings.
+- **Draw a table with data**: Automate the creation of data tables in drawings
 
 ### Natural Language Fallback
 
