@@ -8,7 +8,7 @@ Provides tools for:
 
 import json
 import logging
-from typing import Optional, TypedDict, List, Any
+from typing import Optional, TypedDict
 
 from mcp.server.fastmcp import Context
 
@@ -130,6 +130,7 @@ def register_drawing_tools(mcp):
             if not isinstance(lines_data, list):
                 lines_data = [lines_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, line_spec in enumerate(lines_data):
                 try:
@@ -139,13 +140,17 @@ def register_drawing_tools(mcp):
                     layer = line_spec.get("layer", "0")
                     lineweight = line_spec.get("lineweight", 0)
 
-                    handle = get_current_adapter().draw_line(
-                        start_pt, end_pt, layer, color, lineweight
+                    handle = adapter.draw_line(
+                        start_pt, end_pt, layer, color, lineweight, _skip_refresh=True
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing line {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all lines drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -191,6 +196,7 @@ def register_drawing_tools(mcp):
             if not isinstance(circles_data, list):
                 circles_data = [circles_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, circle_spec in enumerate(circles_data):
                 try:
@@ -204,13 +210,17 @@ def register_drawing_tools(mcp):
                     layer = circle_spec.get("layer", "0")
                     lineweight = circle_spec.get("lineweight", 0)
 
-                    handle = get_current_adapter().draw_circle(
-                        center_pt, radius, layer, color, lineweight
+                    handle = adapter.draw_circle(
+                        center_pt, radius, layer, color, lineweight, _skip_refresh=True
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing circle {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all circles drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -256,6 +266,7 @@ def register_drawing_tools(mcp):
             if not isinstance(arcs_data, list):
                 arcs_data = [arcs_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, arc_spec in enumerate(arcs_data):
                 try:
@@ -267,7 +278,7 @@ def register_drawing_tools(mcp):
                     layer = arc_spec.get("layer", "0")
                     lineweight = arc_spec.get("lineweight", 0)
 
-                    handle = get_current_adapter().draw_arc(
+                    handle = adapter.draw_arc(
                         center_pt,
                         radius,
                         start_angle,
@@ -275,11 +286,16 @@ def register_drawing_tools(mcp):
                         layer,
                         color,
                         lineweight,
+                        _skip_refresh=True,
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing arc {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all arcs drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -327,6 +343,7 @@ def register_drawing_tools(mcp):
             if not isinstance(rects_data, list):
                 rects_data = [rects_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, rect_spec in enumerate(rects_data):
                 try:
@@ -336,13 +353,15 @@ def register_drawing_tools(mcp):
                     layer = rect_spec.get("layer", "0")
                     lineweight = rect_spec.get("lineweight", 0)
 
-                    handle = get_current_adapter().draw_rectangle(
-                        pt1, pt2, layer, color, lineweight
-                    )
+                    handle = adapter.draw_rectangle(pt1, pt2, layer, color, lineweight)
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing rectangle {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all rectangles drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -390,6 +409,7 @@ def register_drawing_tools(mcp):
             if not isinstance(polylines_data, list):
                 polylines_data = [polylines_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, poly_spec in enumerate(polylines_data):
                 try:
@@ -408,13 +428,17 @@ def register_drawing_tools(mcp):
                     layer = poly_spec.get("layer", "0")
                     lineweight = poly_spec.get("lineweight", 0)
 
-                    handle = get_current_adapter().draw_polyline(
-                        point_list, closed, layer, color, lineweight
+                    handle = adapter.draw_polyline(
+                        point_list, closed, layer, color, lineweight, _skip_refresh=True
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing polyline {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all polylines drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -460,6 +484,7 @@ def register_drawing_tools(mcp):
             if not isinstance(texts_data, list):
                 texts_data = [texts_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, text_spec in enumerate(texts_data):
                 try:
@@ -470,13 +495,23 @@ def register_drawing_tools(mcp):
                     color = text_spec.get("color", "white")
                     layer = text_spec.get("layer", "0")
 
-                    handle = get_current_adapter().draw_text(
-                        pos, text_content, height, rotation, layer, color
+                    handle = adapter.draw_text(
+                        pos,
+                        text_content,
+                        height,
+                        rotation,
+                        layer,
+                        color,
+                        _skip_refresh=True,
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error drawing text {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all texts drawn
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {
@@ -524,6 +559,7 @@ def register_drawing_tools(mcp):
             if not isinstance(dims_data, list):
                 dims_data = [dims_data]
 
+            adapter = get_current_adapter()
             results = []
             for i, dim_spec in enumerate(dims_data):
                 try:
@@ -534,13 +570,24 @@ def register_drawing_tools(mcp):
                     text = dim_spec.get("text")
                     offset = dim_spec.get("offset", 10.0)
 
-                    handle = get_current_adapter().add_dimension(
-                        start_pt, end_pt, None, text, layer, color, offset
+                    handle = adapter.add_dimension(
+                        start_pt,
+                        end_pt,
+                        None,
+                        text,
+                        layer,
+                        color,
+                        offset,
+                        _skip_refresh=True,
                     )
                     results.append({"index": i, "handle": handle, "success": True})
                 except Exception as e:
                     logger.error(f"Error adding dimension {i}: {e}")
                     results.append({"index": i, "success": False, "error": str(e)})
+
+            # Single refresh after all dimensions added
+            if results:
+                adapter.refresh_view()
 
             return json.dumps(
                 {

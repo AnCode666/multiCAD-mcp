@@ -235,12 +235,17 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
-        """Draw a line."""
+        """Draw a line.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         document = self._get_document("draw_line")
 
-        start_pt = self.normalize_coordinate(start)
-        end_pt = self.normalize_coordinate(end)
+        start_pt = CADInterface.normalize_coordinate(start)
+        end_pt = CADInterface.normalize_coordinate(end)
 
         start_array = self._to_variant_array(start_pt)
         end_array = self._to_variant_array(end_pt)
@@ -248,7 +253,8 @@ class AutoCADAdapter(CADInterface):
         line = document.ModelSpace.AddLine(start_array, end_array)
         self._apply_properties(line, layer, color, lineweight)
         self._track_entity(line, "line")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Drew line from {start} to {end}")
         return str(line.Handle)
@@ -260,20 +266,26 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
-        """Draw a circle."""
+        """Draw a circle.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         document = self._get_document("draw_circle")
 
         if radius <= 0:
             raise InvalidParameterError("radius", radius, "positive number")
 
-        center_pt = self.normalize_coordinate(center)
+        center_pt = CADInterface.normalize_coordinate(center)
         center_array = self._to_variant_array(center_pt)
 
         circle = document.ModelSpace.AddCircle(center_array, radius)
         self._apply_properties(circle, layer, color, lineweight)
         self._track_entity(circle, "circle")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Drew circle at {center} with radius {radius}")
         return str(circle.Handle)
@@ -287,11 +299,16 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
-        """Draw an arc."""
+        """Draw an arc.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         document = self._get_document("draw_arc")
 
-        center_pt = self.normalize_coordinate(center)
+        center_pt = CADInterface.normalize_coordinate(center)
         center_array = self._to_variant_array(center_pt)
 
         arc = document.ModelSpace.AddArc(
@@ -302,7 +319,8 @@ class AutoCADAdapter(CADInterface):
         )
         self._apply_properties(arc, layer, color, lineweight)
         self._track_entity(arc, "arc")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Drew arc at {center} from {start_angle}° to {end_angle}°")
         return str(arc.Handle)
@@ -314,11 +332,16 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
-        """Draw a rectangle from two corners."""
+        """Draw a rectangle from two corners.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         self._validate_connection()
-        pt1 = self.normalize_coordinate(corner1)
-        pt2 = self.normalize_coordinate(corner2)
+        pt1 = CADInterface.normalize_coordinate(corner1)
+        pt2 = CADInterface.normalize_coordinate(corner2)
 
         # Create rectangle corners
         points: List[Coordinate] = [
@@ -331,7 +354,12 @@ class AutoCADAdapter(CADInterface):
 
         # Use polyline for rectangle
         return self.draw_polyline(
-            points, closed=True, layer=layer, color=color, lineweight=lineweight
+            points,
+            closed=True,
+            layer=layer,
+            color=color,
+            lineweight=lineweight,
+            _skip_refresh=_skip_refresh,
         )
 
     def draw_polyline(
@@ -341,15 +369,20 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
-        """Draw a polyline through points."""
+        """Draw a polyline through points.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         document = self._get_document("draw_polyline")
 
         if len(points) < 2:
             raise InvalidParameterError("points", points, "at least 2 points")
 
         # Convert to 3D points and flatten to variant array
-        normalized_points = [self.normalize_coordinate(p) for p in points]
+        normalized_points = [CADInterface.normalize_coordinate(p) for p in points]
         variant_points = self._points_to_variant_array(normalized_points)
 
         polyline = document.ModelSpace.AddPolyline(variant_points)
@@ -359,7 +392,8 @@ class AutoCADAdapter(CADInterface):
 
         self._apply_properties(polyline, layer, color, lineweight)
         self._track_entity(polyline, "polyline")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Drew polyline with {len(points)} points")
         return str(polyline.Handle)
@@ -376,8 +410,8 @@ class AutoCADAdapter(CADInterface):
         """Draw an ellipse."""
         document = self._get_document("draw_ellipse")
 
-        center_pt = self.normalize_coordinate(center)
-        major_end = self.normalize_coordinate(major_axis_end)
+        center_pt = CADInterface.normalize_coordinate(center)
+        major_end = CADInterface.normalize_coordinate(major_axis_end)
 
         center_array = self._to_variant_array(center_pt)
         major_array = self._to_variant_array(major_end)
@@ -400,11 +434,16 @@ class AutoCADAdapter(CADInterface):
         rotation: float = 0.0,
         layer: str = "0",
         color: str | int = "white",
+        _skip_refresh: bool = False,
     ) -> str:
-        """Add text to drawing."""
+        """Add text to drawing.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
         document = self._get_document("draw_text")
 
-        pos = self.normalize_coordinate(position)
+        pos = CADInterface.normalize_coordinate(position)
         pos_array = self._to_variant_array(pos)
 
         text_obj = document.ModelSpace.AddText(text, pos_array, height)
@@ -412,7 +451,8 @@ class AutoCADAdapter(CADInterface):
 
         self._apply_properties(text_obj, layer, color)
         self._track_entity(text_obj, "text")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Added text '{text}' at {position}")
         return str(text_obj.Handle)
@@ -432,7 +472,7 @@ class AutoCADAdapter(CADInterface):
         # Create boundary polyline (invisible)
         boundary_polyline = document.ModelSpace.AddPolyline(
             self._points_to_variant_array(
-                [self.normalize_coordinate(p) for p in boundary_points]
+                [CADInterface.normalize_coordinate(p) for p in boundary_points]
             )
         )
         boundary_polyline.Closed = True
@@ -460,6 +500,7 @@ class AutoCADAdapter(CADInterface):
         layer: str = "0",
         color: str | int = "white",
         offset: float = 10.0,
+        _skip_refresh: bool = False,
     ) -> str:
         """Add a dimension annotation with optional offset from the edge.
 
@@ -471,14 +512,15 @@ class AutoCADAdapter(CADInterface):
             layer: Layer name
             color: Color name or index
             offset: Distance to offset the dimension line from the edge (default: 10.0)
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             Entity handle of the created dimension
         """
         document = self._get_document("add_dimension")
 
-        start_pt = self.normalize_coordinate(start)
-        end_pt = self.normalize_coordinate(end)
+        start_pt = CADInterface.normalize_coordinate(start)
+        end_pt = CADInterface.normalize_coordinate(end)
 
         start_array = self._to_variant_array(start_pt)
         end_array = self._to_variant_array(end_pt)
@@ -517,7 +559,8 @@ class AutoCADAdapter(CADInterface):
 
         self._apply_properties(dim, layer, color)
         self._track_entity(dim, "dimension")
-        self.refresh_view()
+        if not _skip_refresh:
+            self.refresh_view()
 
         logger.debug(f"Added dimension from {start} to {end} with offset {offset}")
         return str(dim.Handle)
@@ -587,6 +630,8 @@ class AutoCADAdapter(CADInterface):
     def get_layers_info(self) -> List[Dict[str, Any]]:
         """Get detailed information about all layers.
 
+        Optimized to count entities per layer in a single pass using direct iteration.
+
         Returns:
             List of dictionaries with layer information:
             - Name: Layer name
@@ -601,20 +646,37 @@ class AutoCADAdapter(CADInterface):
             document = self._get_document("get_layers_info")
             layers_info = []
 
-            for layer in document.Layers:
+            # OPTIMIZATION: Pre-count entities by layer in single pass
+            layer_counts: Dict[str, int] = {}
+            model_space = document.ModelSpace
+
+            try:
+                # Direct iteration (faster than Item(i))
+                for entity in model_space:
+                    try:
+                        layer_name = self._safe_get_property(entity, "Layer", "0")
+                        layer_counts[layer_name] = layer_counts.get(layer_name, 0) + 1
+                    except Exception:
+                        pass
+            except Exception:
+                # Fallback to indexed iteration if direct iteration fails
                 try:
-                    # Count objects on this layer
-                    object_count = 0
-                    model_space = document.ModelSpace
                     entity_count = model_space.Count
                     for i in range(entity_count):
                         try:
                             entity = model_space.Item(i)
-                            if self._safe_get_property(entity, "Layer") == layer.Name:
-                                object_count += 1
+                            layer_name = self._safe_get_property(entity, "Layer", "0")
+                            layer_counts[layer_name] = (
+                                layer_counts.get(layer_name, 0) + 1
+                            )
                         except Exception:
                             pass
+                except Exception as e:
+                    logger.debug(f"Failed to count entities by layer: {e}")
 
+            # Build layer information
+            for layer in document.Layers:
+                try:
                     # Get layer properties
                     layer_color = self._safe_get_property(layer, "Color", 256)
                     color_map_reverse = {v: k for k, v in COLOR_MAP.items()}
@@ -622,7 +684,7 @@ class AutoCADAdapter(CADInterface):
 
                     layer_info = {
                         "Name": str(layer.Name),
-                        "ObjectCount": object_count,
+                        "ObjectCount": layer_counts.get(str(layer.Name), 0),
                         "Color": color_name,
                         "Linetype": str(
                             self._safe_get_property(layer, "Linetype", "Continuous")
@@ -1512,89 +1574,272 @@ class AutoCADAdapter(CADInterface):
             logger.error(f"Failed to change entity layer: {e}")
             return False
 
-    # ========== Data Export ==========
+    # ========== Selection Detection ==========
 
-    def extract_drawing_data(self) -> list[dict]:
-        """Extract all drawing data (entities) with their properties.
-
-        Returns a list of dictionaries with columns:
-        - Handle: Entity handle (unique identifier)
-        - ObjectType: Type of object (LINE, CIRCLE, LWPOLYLINE, etc.)
-        - Layer: Layer name
-        - Color: Color index (0-255) or color name
-        - Length: Length (for linear objects)
-        - Area: Area (for closed objects)
-        - Radius: Radius (for circles and arcs)
-        - Circumference: Circumference (2πr for circles, arc length for arcs)
-        - Name: Name (for blocks, layers, etc.)
+    def has_selection(self) -> bool:
+        """Check if any entities are currently selected.
 
         Returns:
-            List of dictionaries containing entity data
+            True if at least one entity is selected, False otherwise
+        """
+        try:
+            self._validate_connection()
+            doc = self._get_document("has_selection")
+
+            # Use PickFirst selection set for reliable detection
+            return doc.PickfirstSelectionSet.Count > 0
+
+        except Exception as e:
+            logger.debug(f"has_selection check failed: {e}")
+            return False
+
+    def get_selected_entity_handles(self) -> list[str]:
+        """Get list of currently selected entity handles.
+
+        Returns:
+            List of entity handles (strings). Empty list if no selection.
+        """
+        try:
+            self._validate_connection()
+            doc = self._get_document("get_selected_entity_handles")
+
+            handles = []
+
+            # Use PickFirst selection set (most reliable)
+            pickfirst = doc.PickfirstSelectionSet
+
+            if pickfirst.Count > 0:
+                for entity in pickfirst:
+                    try:
+                        handles.append(str(entity.Handle))
+                    except Exception as e:
+                        logger.debug(f"Failed to get handle for entity: {e}")
+                        continue
+
+                logger.info(f"Retrieved {len(handles)} selected entity handles")
+                return handles
+
+            logger.debug("No selected entities found")
+            return []
+
+        except Exception as e:
+            logger.error(f"Failed to get selected entity handles: {e}")
+            return []
+
+    def get_selection_info(self) -> dict[str, Any]:
+        """Get comprehensive information about current selection.
+
+        Returns:
+            Dictionary with:
+            - count: Number of selected entities
+            - handles: List of entity handles
+            - types: List of entity ObjectNames
+            - layers: Set of layers containing selected entities
+        """
+        try:
+            self._validate_connection()
+            doc = self._get_document("get_selection_info")
+
+            info: dict[str, Any] = {
+                "count": 0,
+                "handles": [],
+                "types": [],
+                "layers": [],
+            }
+
+            pickfirst = doc.PickfirstSelectionSet
+            info["count"] = pickfirst.Count
+
+            if info["count"] > 0:
+                layers_set: set[str] = set()
+
+                for entity in pickfirst:
+                    try:
+                        info["handles"].append(str(entity.Handle))
+                        info["types"].append(str(entity.ObjectName))
+                        layers_set.add(str(entity.Layer))
+                    except Exception as e:
+                        logger.debug(f"Error extracting entity info: {e}")
+                        continue
+
+                info["layers"] = sorted(list(layers_set))
+
+            return info
+
+        except Exception as e:
+            logger.error(f"Failed to get selection info: {e}")
+            return {"count": 0, "handles": [], "types": [], "layers": []}
+
+    # ========== Data Export ==========
+
+    def extract_drawing_data(self, only_selected: bool = False) -> list[dict]:
+        """Extract drawing data (entities) with their properties.
+
+        Optimized iteration through ModelSpace or selected entities with reduced COM calls.
+        Uses property caching and batch processing for improved performance.
+
+        Args:
+            only_selected: If True, extract only selected entities. If False, extract all.
+                          Defaults to False for backward compatibility.
+
+        Returns:
+            List of dictionaries with columns:
+            - Handle: Entity handle (unique identifier)
+            - ObjectType: Type of object (LINE, CIRCLE, LWPOLYLINE, etc.)
+            - Layer: Layer name
+            - Color: Color index (0-255) or color name
+            - Length: Length (for linear objects)
+            - Area: Area (for closed objects)
+            - Radius: Radius (for circles and arcs)
+            - Circumference: Circumference (2πr for circles, arc length for arcs)
+            - Name: Name (for blocks, layers, etc.)
         """
         try:
             self._validate_connection()
             document = self._get_document("extract_drawing_data")
             entities_data = []
 
-            # Iterate through all entities in ModelSpace
+            # Determine which entities to extract
+            if only_selected:
+                selected_handles = self.get_selected_entity_handles()
+                if not selected_handles:
+                    logger.info("No entities selected - returning empty data")
+                    return []
+
+                logger.info(
+                    f"Extracting data for {len(selected_handles)} selected entities"
+                )
+
+                # Get entities by handle from ModelSpace
+                try:
+                    model_space = document.ModelSpace
+                except Exception as e:
+                    logger.error(f"Failed to access ModelSpace: {e}")
+                    return []
+
+                # Extract only selected entities
+                selected_handles_set = set(selected_handles)
+                entities_to_process = []
+
+                for entity in model_space:
+                    if str(entity.Handle) in selected_handles_set:
+                        entities_to_process.append(entity)
+
+            else:
+                # Get all entities from ModelSpace
+                try:
+                    model_space = document.ModelSpace
+                except Exception as e:
+                    logger.error(f"Failed to access ModelSpace: {e}")
+                    return []
+
+                entities_to_process = list(model_space)
+
+            # Pre-build reverse color map for faster lookups
+            color_map_reverse = {v: k for k, v in COLOR_MAP.items()}
+            import math
+
+            # Optimized iteration with reduced COM calls
+            entity_count = 0
+            error_count = 0
+
             try:
-                model_space = document.ModelSpace
+                for entity in entities_to_process:
+                    entity_count += 1
+
+                    try:
+                        # Extract all basic properties at once (minimize COM calls)
+                        handle = self._safe_get_property(entity, "Handle", "")
+                        object_type = self._safe_get_property(
+                            entity, "ObjectName", "Unknown"
+                        )
+                        layer = self._safe_get_property(entity, "Layer", "0")
+                        object_type_str = str(object_type)
+
+                        # Optimized color extraction (avoid reverse map rebuild per entity)
+                        color_index = self._safe_get_property(entity, "Color", 256)
+                        if color_index == 256:
+                            color = "ByLayer"
+                        else:
+                            color = color_map_reverse.get(color_index, str(color_index))
+
+                        name = self._safe_get_property(entity, "Name", "")
+
+                        # Extract geometry properties with type optimization
+                        length = 0.0
+                        area = 0.0
+                        radius = 0.0
+                        circumference = 0.0
+
+                        # Only fetch geometry properties if they might exist
+                        if any(
+                            keyword in object_type_str
+                            for keyword in [
+                                "Line",
+                                "Polyline",
+                                "Arc",
+                                "Circle",
+                                "Spline",
+                            ]
+                        ):
+                            try:
+                                length_val = self._safe_get_property(entity, "Length")
+                                if length_val is not None:
+                                    length = float(length_val)
+                            except (ValueError, TypeError):
+                                pass
+
+                            try:
+                                area_val = self._safe_get_property(entity, "Area")
+                                if area_val is not None:
+                                    area = float(area_val)
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Only fetch radius/circumference for circles and arcs
+                        if "Circle" in object_type_str or "Arc" in object_type_str:
+                            try:
+                                radius_val = self._safe_get_property(entity, "Radius")
+                                if radius_val is not None:
+                                    radius = float(radius_val)
+                                    # Optimize circumference calculation
+                                    if "Circle" in object_type_str and radius > 0:
+                                        circumference = 2 * math.pi * radius
+                                    elif "Arc" in object_type_str and length > 0:
+                                        circumference = length
+                            except (ValueError, TypeError):
+                                pass
+
+                        entity_data = {
+                            "Handle": str(handle),
+                            "ObjectType": object_type_str,
+                            "Layer": str(layer),
+                            "Color": color,
+                            "Length": round(length, 3) if length > 0 else 0.0,
+                            "Area": round(area, 3) if area > 0 else 0.0,
+                            "Radius": round(radius, 3) if radius > 0 else 0.0,
+                            "Circumference": (
+                                round(circumference, 3) if circumference > 0 else 0.0
+                            ),
+                            "Name": str(name) if name else "",
+                        }
+                        entities_data.append(entity_data)
+
+                    except Exception as e:
+                        logger.debug(
+                            f"Failed to extract entity data (entity #{entity_count}): {e}"
+                        )
+                        error_count += 1
+                        continue
+
             except Exception as e:
-                logger.error(f"Failed to access ModelSpace: {e}")
+                logger.error(f"Failed to iterate selected entities: {e}")
                 return []
 
-            # Iterate using index-based loop (required for COM objects)
-            try:
-                entity_count = model_space.Count
-            except Exception as e:
-                logger.error(f"Failed to get ModelSpace count: {e}")
-                return []
-
-            for i in range(entity_count):
-                try:
-                    entity = model_space.Item(i)
-                except Exception as e:
-                    logger.debug(f"Failed to get entity at index {i}: {e}")
-                    continue
-                try:
-                    # Safely extract each property with fallback values
-                    handle = self._safe_get_property(entity, "Handle", "")
-                    object_type = self._safe_get_property(
-                        entity, "ObjectName", "Unknown"
-                    )
-                    layer = self._safe_get_property(entity, "Layer", "0")
-                    color = self._get_entity_color(entity)
-                    length = self._get_entity_length(entity)
-                    area = self._get_entity_area(entity)
-                    name = self._get_entity_name(entity)
-                    radius = self._get_entity_radius(entity)
-                    circumference = self._get_entity_circumference(entity)
-
-                    entity_data = {
-                        "Handle": str(handle),
-                        "ObjectType": str(object_type),
-                        "Layer": str(layer),
-                        "Color": color,
-                        "Length": (
-                            round(length, 3) if length > 0 else 0.0
-                        ),  # Keep as float, round to 3 decimals
-                        "Area": (
-                            round(area, 3) if area > 0 else 0.0
-                        ),  # Keep as float, round to 3 decimals
-                        "Radius": (
-                            round(radius, 3) if radius > 0 else 0.0
-                        ),  # Keep as float, round to 3 decimals
-                        "Circumference": (
-                            round(circumference, 3) if circumference > 0 else 0.0
-                        ),  # Keep as float, round to 3 decimals
-                        "Name": name,
-                    }
-                    entities_data.append(entity_data)
-                except Exception as e:
-                    logger.debug(f"Failed to extract data for entity: {e}")
-                    continue
-
-            logger.info(f"Extracted data from {len(entities_data)} entities")
+            logger.info(
+                f"Extracted data from {len(entities_data)} entities "
+                f"(processed {entity_count}, {error_count} errors)"
+            )
             return entities_data
 
         except Exception as e:
@@ -1829,83 +2074,6 @@ class AutoCADAdapter(CADInterface):
         except Exception as e:
             logger.error(f"Failed to export to Excel: {e}")
             return False
-
-    def _get_entity_color(self, entity: Any) -> str:
-        """Get entity color as string."""
-        try:
-            color_index = self._safe_get_property(entity, "Color", 256)
-            if color_index == 256:  # By layer
-                return "ByLayer"
-            # Try to map color index to name
-            color_map_reverse = {v: k for k, v in COLOR_MAP.items()}
-            return color_map_reverse.get(color_index, str(color_index))
-        except Exception as e:
-            logger.debug(f"Failed to get entity color: {e}")
-            return "Unknown"
-
-    def _get_entity_length(self, entity: Any) -> float:
-        """Get entity length if applicable."""
-        try:
-            # Works for lines, polylines, arcs, circles (perimeter)
-            length = self._safe_get_property(entity, "Length")
-            if length is not None:
-                return float(length)
-        except Exception as e:
-            logger.debug(f"Failed to get entity length: {e}")
-        return 0.0
-
-    def _get_entity_area(self, entity: Any) -> float:
-        """Get entity area if applicable."""
-        try:
-            # Works for closed polylines, circles, etc.
-            area = self._safe_get_property(entity, "Area")
-            if area is not None:
-                return float(area)
-        except Exception as e:
-            logger.debug(f"Failed to get entity area: {e}")
-        return 0.0
-
-    def _get_entity_radius(self, entity: Any) -> float:
-        """Get entity radius if applicable (for circles and arcs)."""
-        try:
-            # Check if entity has Radius property
-            radius = self._safe_get_property(entity, "Radius")
-            if radius is not None:
-                return float(radius)
-        except Exception as e:
-            logger.debug(f"Failed to get entity radius: {e}")
-        return 0.0
-
-    def _get_entity_circumference(self, entity: Any) -> float:
-        """Get circumference for circular objects."""
-        try:
-            # For circles: circumference = 2 * π * r
-            # For arcs: use Length property (arc length)
-            object_type = self._safe_get_property(entity, "ObjectName", "")
-
-            if "Circle" in str(object_type):
-                radius = self._get_entity_radius(entity)
-                if radius > 0:
-                    import math
-
-                    return 2 * math.pi * radius
-            elif "Arc" in str(object_type):
-                # For arcs, Length is the arc length
-                return self._get_entity_length(entity)
-        except Exception as e:
-            logger.debug(f"Failed to get entity circumference: {e}")
-        return 0.0
-
-    def _get_entity_name(self, entity: Any) -> str:
-        """Get entity name if applicable."""
-        try:
-            # For blocks, layers, etc.
-            name = self._safe_get_property(entity, "Name")
-            if name is not None:
-                return str(name)
-        except Exception as e:
-            logger.debug(f"Failed to get entity name: {e}")
-        return ""
 
     # ========== Undo/Redo ==========
 

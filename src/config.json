@@ -1,6 +1,6 @@
 {
   "debug": false,
-  "logging_level": "DEBUG",
+  "logging_level": "INFO",
   "cad": {
     "autocad": {
       "type": "AUTOCAD",

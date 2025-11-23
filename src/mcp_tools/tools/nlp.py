@@ -178,11 +178,11 @@ def register_nlp_tools(mcp):
             return _result_to_string(result)
 
         elif operation == "turn_layer_on":
-            result = get_current_adapter().turn_on_layer(params.get("name", "0"))
+            result = get_current_adapter().turn_layer_on(params.get("name", "0"))
             return _result_to_string(result)
 
         elif operation == "turn_layer_off":
-            result = get_current_adapter().turn_off_layer(params.get("name", "0"))
+            result = get_current_adapter().turn_layer_off(params.get("name", "0"))
             return _result_to_string(result)
 
         elif operation == "list_layers":

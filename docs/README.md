@@ -61,7 +61,7 @@ docs/
 ├── 02-ARCHITECTURE.md          # System design and architecture
 ├── 03-EXTENDING.md             # Guide to adding new features
 ├── 04-TROUBLESHOOTING.md       # Debugging and troubleshooting
-├── 05-REFERENCE.md             # Complete API reference (40+ tools)
+├── 05-REFERENCE.md             # Complete API reference
 ├── 06-GIT_SETUP.md             # Git workflow and contribution guide
 └── 07-CHANGELOG.md             # Version history and changes
 ```
@@ -79,9 +79,9 @@ docs/
 
 ## Project Statistics
 
-- **47 MCP Tools** organized in 9 categories (13 new batch operations)
+- **46 MCP Tools** organized in 9 categories (13 batch operations)
 - **Software CAD compatible:** AutoCAD®, ZWCAD®, GstarCAD®, BricsCAD®
-- **47% batch-optimized tools** reducing API calls by 60-70%
+- **30% batch-optimized tools** (13 of 46) reducing API calls by 60-70%
 - **Full type hints** throughout codebase
 - **Complete test coverage** for critical components
 

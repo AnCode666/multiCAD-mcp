@@ -114,7 +114,7 @@ multiCAD-mcp/
 │   │   ├── constants.py     # Color maps, selection sets, timing
 │   │   ├── decorators.py    # @cad_tool decorator & adapter injection
 │   │   ├── helpers.py       # Utilities (parsing, logging, formatting)
-│   │   └── tools/           # MCP tools (9 categories, 40+ tools)
+│   │   └── tools/           # MCP tools (9 categories, 46 tools)
 │   │       ├── __init__.py  # Tools package initialization
 │   │       ├── connection.py # CAD connection management
 │   │       ├── debug.py     # Debug utilities
@@ -152,7 +152,7 @@ multiCAD-mcp/
 │   ├── 02-ARCHITECTURE.md   # System design & architecture
 │   ├── 03-EXTENDING.md      # Adding new features guide
 │   ├── 04-TROUBLESHOOTING.md # Debug & troubleshooting
-│   ├── 05-REFERENCE.md      # Complete tool reference (40+ tools)
+│   ├── 05-REFERENCE.md      # Complete tool reference (46 tools)
 │   ├── 06-GIT_SETUP.md      # Git workflow
 │   └── 07-CHANGELOG.md      # Version history
 │
@@ -233,7 +233,7 @@ mypy src/
 
 **Operations (CAD-specific)**:
 
-- `tools/*.py` - Individual tool modules (53 tools total)
+- `tools/*.py` - Individual tool modules (46 tools organized in 9 categories)
 - `adapters/*.py` - CAD implementations
 - `nlp/processor.py` - Natural language parsing
 

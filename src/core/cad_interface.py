@@ -109,6 +109,7 @@ class CADInterface(ABC):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Draw a line from start to end point.
@@ -119,6 +120,7 @@ class CADInterface(ABC):
             layer: Layer name
             color: Color name or index
             lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID
@@ -133,6 +135,7 @@ class CADInterface(ABC):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Draw a circle.
@@ -143,6 +146,7 @@ class CADInterface(ABC):
             layer: Layer name
             color: Color name or index
             lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID
@@ -159,6 +163,7 @@ class CADInterface(ABC):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Draw an arc.
@@ -171,6 +176,7 @@ class CADInterface(ABC):
             layer: Layer name
             color: Color name or index
             lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID
@@ -185,6 +191,7 @@ class CADInterface(ABC):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Draw a rectangle from two opposite corners.
@@ -195,6 +202,7 @@ class CADInterface(ABC):
             layer: Layer name
             color: Color name or index
             lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID (may be multiple for rectangle polyline)
@@ -209,6 +217,7 @@ class CADInterface(ABC):
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Draw a polyline through multiple points.
@@ -219,6 +228,7 @@ class CADInterface(ABC):
             layer: Layer name
             color: Color name or index
             lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID
@@ -260,6 +270,7 @@ class CADInterface(ABC):
         rotation: float = 0.0,
         layer: str = "0",
         color: str | int = "white",
+        _skip_refresh: bool = False,
     ) -> str:
         """
         Add text to the drawing.
@@ -271,6 +282,7 @@ class CADInterface(ABC):
             rotation: Rotation angle in degrees
             layer: Layer name
             color: Color name or index
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
             str: Entity handle/ID

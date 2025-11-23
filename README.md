@@ -9,7 +9,7 @@ multiCAD-mcp is an MCP server that lets you control your CAD software using AI a
 ## Features
 
 - **Multiple CAD Support**: Works with AutoCAD®, ZWCAD®, GstarCAD®, and BricsCAD®
-- **47 MCP Tools**: Comprehensive set of drawing, layer, entity, and file management tools
+- **46 MCP Tools**: Comprehensive set of drawing, layer, entity, and file management tools
 - **Batch Operations** (v0.1.1+): 60-70% fewer API calls when managing multiple items
 - **Simple command execution**: "Draw a red circle at 50,50 with radius 25" - no complex syntax needed
 - **Complex tasks execution**: "Draw the graph of y = sen(X) and label the axes"
@@ -84,7 +84,7 @@ Replace `C:\path\to\multiCAD-mcp` with your actual installation path.
 
 ### Direct Tool Calls
 
-multiCAD-mcp provides **47 MCP tools** with batch operation support for efficiency:
+multiCAD-mcp provides **46 MCP tools** with batch operation support for efficiency:
 
 #### Drawing (8 tools - 7 batch optimized)
 
@@ -142,10 +142,12 @@ multiCAD-mcp provides **47 MCP tools** with batch operation support for efficien
 - **get_open_drawings**: List open files
 - **switch_drawing**: Switch between open drawings
 
-#### Data Export (2 tools)
+#### Data Export (4 tools)
 
-- **export_drawing_to_excel**: Export entities and layers to Excel
-- **extract_drawing_data**: Get raw entity data as JSON
+- **export_drawing_to_excel**: Export all entities to Excel file
+- **extract_drawing_data**: Get all entity data as JSON
+- **export_selected_to_excel**: Export only selected entities to Excel file
+- **extract_selected_data**: Get only selected entity data as JSON
 
 #### Connection & Control (9 tools)
 
@@ -190,6 +192,27 @@ turn_layers_off('["Reference", "Hidden", "Notes"]')
 - Detailed per-item error reporting
 - Structured JSON responses
 - Faster execution and lower token usage
+
+### Selected Entity Export (v0.1.1+)
+
+Export or extract data from only the entities currently selected in your CAD viewport:
+
+```text
+# Export selected entities to Excel
+export_selected_to_excel(filename="selected_entities.xlsx")
+→ Exports only selected entities with all properties
+
+# Extract selected entity data as JSON
+extract_selected_data()
+→ Returns JSON array with selected entities' data
+```
+
+**Use Cases**:
+
+- Export a subset of entities without exporting the entire drawing
+- Analyze properties of selected features
+- Create reports for specific design elements
+- Work with portions of large drawings efficiently
 
 ### Complex Tasks
 
@@ -311,9 +334,11 @@ Available levels (from most to least verbose):
 
 ## Project Status
 
-**Version 0.1.0** - First stable version
+**Version 0.1.1** - Batch operations and selection-based export
 
-- 40+ MCP tools covering all major CAD operations
+- **46 MCP tools** covering all major CAD operations
+- **13 batch operation tools** for 60-70% API call reduction
+- **Selection-based export** - Export only selected entities to Excel/JSON
 - Comprehensive error handling
 - Full type safety with Python type hints
 - Automated tests for all major components

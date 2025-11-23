@@ -51,7 +51,7 @@ Overview of how multiCAD-mcp is organized and how components interact.
 
 **Role**: Entry point that registers and orchestrates all tools.
 
-- Initializes FastMCP with 40+ MCP tools
+- Initializes FastMCP with 46 MCP tools
 - Tools organized into 9 categories (connection, drawing, entities, files, layers, nlp, simple, debug, export)
 - Handles auto-detection of connected CAD applications on startup
 - Lean entry point that delegates to mcp_tools modules
@@ -73,7 +73,7 @@ Overview of how multiCAD-mcp is organized and how components interact.
 
 ### 3. MCP Tools (`mcp_tools/tools/`)
 
-**9 Tool Modules** (40+ tools total):
+**9 Tool Modules** (46 tools total):
 
 - **connection.py**: Connect/disconnect CAD, check status, list supported apps
 - **drawing.py**: Draw lines, circles, rectangles, polylines, text, dimensions

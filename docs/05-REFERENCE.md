@@ -784,7 +784,7 @@ All coordinate parameters accept:
 
 ## Summary
 
-Total: **47 MCP tools** (optimized with batch operations)
+Total: **46 MCP tools** (optimized with batch operations)
 
 - 4 Connection tools
 - 8 Drawing tools (7 batch + 1 helper)
@@ -798,7 +798,7 @@ Total: **47 MCP tools** (optimized with batch operations)
 
 ### Batch Operations Optimization
 
-**47% of tools are now batch-optimized**:
+**30% of tools are batch-optimized** (13 of 46):
 
 - Drawing: 7/8 tools support batch operations
 - Layers: 4/7 tools support batch operations

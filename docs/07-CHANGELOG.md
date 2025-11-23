@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - 2025-11-22
 
-### Added - Batch Operations Optimization
+### Added - Batch Operations Optimization & Selection-Based Export
 
-Implemented batch operation tools to reduce API calls and improve efficiency for the Claude AI assistant when making multiple drawings or managing layers.
+Implemented batch operation tools to reduce API calls and improve efficiency for the Claude AI assistant when making multiple drawings or managing layers. Also added selection-based export capabilities to work with subsets of entities.
 
 #### New Tools
 
@@ -35,6 +35,11 @@ Implemented batch operation tools to reduce API calls and improve efficiency for
 - `change_entities_colors` - Change color of multiple entity groups with individual colors
 - `change_entities_layers` - Move multiple entity groups to different layers
 
+**Export Tools** (2 new selection-based operations):
+
+- `export_selected_to_excel` - Export only selected entities to Excel file
+- `extract_selected_data` - Extract only selected entities data as JSON
+
 #### Improvements
 
 - **JSON-based Input Format**: All batch operations accept JSON arrays for clean, structured data
@@ -54,14 +59,15 @@ Implemented batch operation tools to reduce API calls and improve efficiency for
 
 #### Documentation
 
-- Updated `05-REFERENCE.md` with all new batch operation details
+- Updated `05-REFERENCE.md` with all new batch operation and selection export details
+- Updated main `README.md` with 46 MCP tools reference and selection export examples
 - Added JSON structure examples for each batch operation
 - Added test suite `test_batch_operations.py` with 20+ test cases
-- Updated tool summary: 47 tools total (13 new batch operations)
+- Updated tool summary: **46 tools total** (13 batch operations + 2 selection-based exports)
 
 #### Technical Details
 
-**Data Structure**: Uses Python `TypedDict` for type safety
+**Batch Operations - Data Structure**: Uses Python `TypedDict` for type safety
 
 ```python
 class LineSpec(TypedDict, total=False):
@@ -72,8 +78,24 @@ class LineSpec(TypedDict, total=False):
     lineweight: int
 ```
 
-**Input Format**: JSON string containing array of specifications
-**Output Format**: Structured JSON with operation status and error details
+**Batch Operations - Input/Output**:
+
+- **Input Format**: JSON string containing array of specifications
+- **Output Format**: Structured JSON with operation status and error details
+
+**Selection Detection - Implementation**:
+
+- Uses AutoCAD COM API `PickfirstSelectionSet` for reliable entity selection detection
+- New adapter methods: `has_selection()`, `get_selected_entity_handles()`, `get_selection_info()`
+- Enhanced `extract_drawing_data()` with optional `only_selected: bool` parameter
+- Handle-based filtering for O(n) performance even with large drawings
+
+**Excel Export - MergedCell Handling**:
+
+- Safe cell value assignment via `set_cell_value_safe()` helper function
+- Detects merged cell ranges and writes to anchor cell (top-left)
+- Prevents openpyxl type errors when working with merged cells
+- Maintains cell formatting (fill, font, alignment) for styled headers
 
 ---
 
@@ -90,7 +112,7 @@ multiCAD-mcp is a MCP (Model Context Protocol) server that enables natural langu
   - ProgID-based CAD selection
   - Windows COM API integration
 
-- **40+ MCP Tools** organized in 9 categories:
+- **46 MCP Tools** organized in 9 categories:
   - Connection management
   - Drawing operations (lines, circles, arcs, rectangles, ellipses, polylines, text, hatches, dimensions)
   - Layer management
@@ -130,7 +152,7 @@ multiCAD-mcp is a MCP (Model Context Protocol) server that enables natural langu
 - `02-ARCHITECTURE.md` - System design and architecture
 - `03-EXTENDING.md` - Guide to adding new features
 - `04-TROUBLESHOOTING.md` - Debugging and troubleshooting
-- `05-REFERENCE.md` - Complete API reference (40+ tools)
+- `05-REFERENCE.md` - Complete API reference (46 tools)
 - `06-GIT_SETUP.md` - Git workflow and contribution guide
 - `07-CHANGELOG.md` - This file
 
@@ -203,6 +225,6 @@ When contributing, please:
 
 ---
 
-**Current Status**: First stable version
+**Current Status**: Batch operations & selection-based export
 **Maintenance**: Active Development
-**Last Updated**: 2025-11-12
+**Last Updated**: 2025-11-23

@@ -16,7 +16,7 @@
 feat(version): implement centralized version management and simplify config
 
 Complete project implementation:
-- FastMCP 2.0 server with 40+ MCP tools in 9 categories
+- FastMCP 2.0 server with 46 MCP tools in 9 categories
 - Universal CAD adapter supporting AutoCAD®, ZWCAD®, GstarCAD®, BricsCAD®
 - Factory pattern for CAD type selection via ProgID
 - Natural language processing for command interpretation
