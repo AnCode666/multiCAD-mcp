@@ -585,6 +585,179 @@ Move multiple entity groups to different layers.
 
 **Returns**: JSON with operation status
 
+## Block Tools
+
+Tools for inserting, listing and auditing block definitions and block references in CAD drawings.
+
+These tools enable precise and high-performance block management workflows, including optimized batch insertion to reduce CAD API calls.
+
+---
+
+### insert_block
+
+Insert a block reference into the drawing.
+
+**Parameters**:
+
+- `block_name` (string)  
+  Name of the block definition to insert.
+
+- `insertion_point` (string)  
+  Insertion point in `"x,y"` or `"x,y,z"` format.
+
+- `scale` (float, optional)  
+  Uniform scale factor. Default: `1.0`.
+
+- `rotation` (float, optional)  
+  Rotation angle in degrees. Default: `0.0`.
+
+- `layer` (string, optional)  
+  Target layer for the block reference. Default: `"0"`.
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "message": "Block 'Tree_01' inserted.",
+  "block_name": "Tree_01",
+  "handle": "2F3A",
+  "insertion_point": "10,20",
+  "scale": 1.5,
+  "rotation": 0,
+  "layer": "VEGETATION"
+}
+```
+
+---
+
+### insert_blocks_batch
+
+Insert multiple block references in a single optimized operation.
+
+This tool defers viewport refresh until all insertions are completed, significantly improving performance when inserting many blocks.
+
+**Parameters**:
+
+- `blocks` (array)  
+  List of block definitions with the following fields:
+
+```json
+[
+  {
+    "block_name": "Tree_01",
+    "insertion_point": "10,20",
+    "scale": 1.2,
+    "rotation": 0,
+    "layer": "VEGETATION"
+  }
+]
+```
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "inserted": 10,
+  "failed": 0,
+  "results": [
+    {
+      "index": 0,
+      "success": true,
+      "handle": "3A1F",
+      "block_name": "Tree_01"
+    }
+  ]
+}
+```
+
+---
+
+### list_blocks
+
+List all non-system block definitions available in the drawing.
+
+System blocks (names starting with `*`) are automatically excluded.
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "count": 5,
+  "blocks": [
+    "Tree_01",
+    "Car_Compact",
+    "Door_90",
+    "Window_120"
+  ]
+}
+```
+
+---
+
+### get_block_info
+
+Retrieve detailed information about a block definition.
+
+**Parameters**:
+
+- `block_name` (string)
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "info": {
+    "Name": "Tree_01",
+    "Origin": [0, 0, 0],
+    "ObjectCount": 12,
+    "IsXRef": false,
+    "Comments": "Vegetation block"
+  }
+}
+```
+
+---
+
+### get_block_references
+
+List all block references (instances) of a specific block in the drawing.
+
+This tool is useful for auditing, validation and analysis workflows.
+
+**Parameters**:
+
+- `block_name` (string)
+
+**Returns**:
+
+```json
+{
+  "success": true,
+  "count": 3,
+  "references": [
+    {
+      "Handle": "4B2C",
+      "InsertionPoint": [10, 20, 0],
+      "ScaleFactors": [1.0, 1.0, 1.0],
+      "Rotation": 0,
+      "Layer": "VEGETATION"
+    }
+  ]
+}
+```
+
+---
+
+### Notes
+
+- Block tools rely on native CAD block definitions and references.
+- Batch operations are optimized to minimize COM/API calls.
+- Full support depends on the active CAD adapter (AutoCAD®, ZWCAD®, GstarCAD®, BricsCAD®).
+
 ## Simple Tools (3 tools)
 
 ### zoom_extents

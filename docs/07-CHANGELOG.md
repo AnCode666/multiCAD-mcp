@@ -5,6 +5,12 @@ All notable changes to multiCAD-mcp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Block management tools (insert, batch insert, list and audit blocks)
+
 ## [0.1.1] - 2025-11-22
 
 ### Added - Batch Operations Optimization & Selection-Based Export

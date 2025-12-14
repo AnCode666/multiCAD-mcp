@@ -25,6 +25,7 @@ from mcp_tools.tools import (
     register_nlp_tools,
     register_export_tools,
     register_debug_tools,
+    register_block_tools,
 )
 
 # Setup at module load
@@ -44,6 +45,7 @@ def register_all_tools():
     - Layer management
     - File operations
     - Entity selection and manipulation
+    - Block management
     - Simple view and history tools
     - Natural language command execution
     - Debug and diagnostic tools
@@ -64,6 +66,9 @@ def register_all_tools():
 
     register_entity_tools(mcp)
     logger.debug("  ✓ Entity tools registered")
+    
+    register_block_tools(mcp)
+    logger.debug("  ✓ Block tools registered")
 
     register_simple_tools(mcp)
     logger.debug("  ✓ Simple tools registered")
