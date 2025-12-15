@@ -22,6 +22,7 @@ from .simple import register_simple_tools
 from .nlp import register_nlp_tools
 from .export import register_export_tools
 from .debug import register_debug_tools
+from .blocks import register_block_tools
 
 __all__ = [
     "register_connection_tools",
@@ -33,4 +34,5 @@ __all__ = [
     "register_nlp_tools",
     "register_export_tools",
     "register_debug_tools",
+    "register_block_tools",
 ]

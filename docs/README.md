@@ -80,6 +80,7 @@ docs/
 ## Project Statistics
 
 - **46 MCP Tools** organized in 9 categories (13 batch operations)
+- **Block management tools** for inserting, listing and auditing CAD blocks, including high-performance batch insertion
 - **Software CAD compatible:** AutoCAD®, ZWCAD®, GstarCAD®, BricsCAD®
 - **30% batch-optimized tools** (13 of 46) reducing API calls by 60-70%
 - **Full type hints** throughout codebase
