@@ -12,7 +12,9 @@ import logging
 from typing import Optional
 
 from mcp.server.fastmcp import Context
+from pydantic import ValidationError
 
+from core.models import CreateLayerRequest
 from mcp_tools.decorators import cad_tool, get_current_adapter
 from mcp_tools.helpers import result_message
 
@@ -33,7 +35,7 @@ def register_layer_tools(mcp):
         ctx: Context,
         name: str,
         color: str = "white",
-        lineweight: int = 0,
+        lineweight: int = 25,
         cad_type: Optional[str] = None,
     ) -> str:
         """
@@ -48,8 +50,19 @@ def register_layer_tools(mcp):
         Returns:
             Status message
         """
-        success = get_current_adapter().create_layer(name, color, lineweight)
-        return result_message("create layer", success, name)
+        try:
+            # Use Pydantic validation
+            validated = CreateLayerRequest(
+                name=name, color=color, lineweight=lineweight
+            )
+            success = get_current_adapter().create_layer(
+                validated.name, validated.color, validated.lineweight
+            )
+            return result_message("create layer", success, name)
+        except ValidationError as e:
+            error_msg = f"Validation error: {e.errors()[0]['msg']}"
+            logger.error(f"Validation error creating layer: {error_msg}")
+            return result_message("create layer", False, f"{name}: {error_msg}")
 
     @cad_tool(mcp, "list_layers")
     def list_layers(
@@ -354,3 +367,47 @@ def register_layer_tools(mcp):
                 },
                 indent=2,
             )
+
+    # ========== LAYER COLOR OPERATIONS ==========
+
+    @cad_tool(mcp, "set_layer_color")
+    def set_layer_color(
+        ctx: Context,
+        layer_name: str,
+        color: str,
+        cad_type: Optional[str] = None,
+    ) -> str:
+        """
+        Set the color of a layer.
+
+        Args:
+            layer_name: Name of the layer to modify
+            color: Color name (red, blue, green, etc.) or ACI index (1-255)
+            cad_type: CAD application to use
+
+        Returns:
+            Status message
+
+        Example:
+            set_layer_color(layer_name="Walls", color="red")
+            set_layer_color(layer_name="Doors", color="blue")
+
+        Note:
+            - Uses modern TrueColor property (recommended by Autodesk)
+            - Available colors: red, blue, green, yellow, cyan, magenta, white, gray, etc.
+            - Color 'bylayer' (256) is not valid for layers
+        """
+        adapter = get_current_adapter()
+
+        try:
+            success = adapter.set_layer_color(layer_name, color)
+            if success:
+                return result_message(
+                    f"Set layer '{layer_name}' color to '{color}'", True
+                )
+            else:
+                return result_message(
+                    f"Failed to set layer '{layer_name}' color", False
+                )
+        except Exception as e:
+            return result_message(f"Error setting layer color: {str(e)}", False)

@@ -9,7 +9,8 @@ multiCAD-mcp is an MCP server that lets you control your CAD software using AI a
 ## Features
 
 - **Multiple CAD Support**: Works with AutoCAD®, ZWCAD®, GstarCAD®, and BricsCAD®
-- **46 MCP Tools**: Comprehensive set of drawing, layer, entity, and file management tools
+- **54 MCP Tools**: Comprehensive set of drawing, layer, entity, block, and file management tools
+- **Block Creation** (v0.1.2+): Create blocks from entities or user selection
 - **Batch Operations** (v0.1.1+): 60-70% fewer API calls when managing multiple items
 - **Simple command execution**: "Draw a red circle at 50,50 with radius 25" - no complex syntax needed
 - **Complex tasks execution**: "Draw the graph of y = sen(X) and label the axes"
@@ -84,9 +85,9 @@ Replace `C:\path\to\multiCAD-mcp` with your actual installation path.
 
 ### Direct Tool Calls
 
-multiCAD-mcp provides **46 MCP tools** with batch operation support for efficiency:
+multiCAD-mcp provides **54 MCP tools** with batch operation support for efficiency:
 
-#### Drawing (8 tools - 7 batch optimized)
+#### Drawing (9 tools - 7 batch optimized)
 
 **Batch Operations** (recommended for multiple items):
 
@@ -97,6 +98,10 @@ multiCAD-mcp provides **46 MCP tools** with batch operation support for efficien
 - **draw_polylines**: Draw multiple polylines in one call
 - **draw_texts**: Add multiple text labels in one call
 - **add_dimensions**: Add multiple dimensions in one call
+
+**Block Operations**:
+
+- **create_block**: Create blocks from entity handles or user selection
 
 **Helper Tools**:
 
@@ -249,9 +254,6 @@ Edit `src/config.json` to customize:
   "output": {
     "directory": "~/Documents/multiCAD Exports"
   },
-  "nlp": {
-    "strict_mode": false
-  }
 }
 ```
 
@@ -261,7 +263,6 @@ Edit `src/config.json` to customize:
 - **`startup_wait_time`**: Seconds to wait for CAD application to start (increase if CAD is slow)
 - **`command_delay`**: Delay between commands in seconds
 - **`output.directory`**: Default directory for saved drawings and exports
-- **`nlp.strict_mode`**: When `true`, requires all parameters in natural language commands
 
 ## Troubleshooting
 
@@ -299,7 +300,7 @@ Available levels (from most to least verbose):
 - `WARNING`: Warning messages for potential issues
 - `ERROR`: Error messages only
 
-**Note**: As noted before, the `config.json` file controls various aspects of multiCAD-mcp behavior including CAD startup timeouts, output directories, and NLP settings. Restart the MCP server after changing configuration.
+**Note**: Restart the MCP server after changing configuration.
 
 ### "Connection failed"
 
@@ -334,9 +335,10 @@ Available levels (from most to least verbose):
 
 ## Project Status
 
-**Version 0.1.1** - Batch operations and selection-based export
+**Version 0.1.2** - Block creation, code optimization, and set color by layer
 
-- **46 MCP tools** covering all major CAD operations
+- **47 MCP tools** covering all major CAD operations (added `create_block`)
+- **Block creation** from entity handles or user selection
 - **13 batch operation tools** for 60-70% API call reduction
 - **Selection-based export** - Export only selected entities to Excel/JSON
 - Comprehensive error handling

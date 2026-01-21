@@ -19,7 +19,12 @@ COLOR_MAP = {
     "light_gray": 252,
     "dark_gray": 251,
     "orange": 30,
+    "bylayer": 256,  # Special value for entities to inherit layer color
 }
+
+# Special color constants
+AC_BY_BLOCK = 0  # Color ByBlock
+AC_BY_LAYER = 256  # Color ByLayer (for entities only)
 
 # ========== Selection Set Names ==========
 

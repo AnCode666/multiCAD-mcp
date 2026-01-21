@@ -13,8 +13,8 @@ import logging
 from mcp.server.fastmcp import Context
 
 from core import get_supported_cads, CADConnectionError
-from adapters import create_adapter
-from mcp_tools.adapter_manager import get_cad_instances
+from adapters import AutoCADAdapter
+from adapters.adapter_manager import get_cad_instances
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def register_connection_tools(mcp):
                 return f"Already connected to {cad_type}"
 
         try:
-            adapter = create_adapter(cad_type)
+            adapter = AutoCADAdapter(cad_type)
             adapter.connect()
             cad_instances[cad_type] = adapter
             logger.info(f"Connected to {cad_type}")

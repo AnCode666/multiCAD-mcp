@@ -28,21 +28,11 @@ class OutputConfig:
 
 
 @dataclass
-class NLPConfig:
-    """Configuration for NLP processor."""
-
-    default_language: str  # en, es, etc.
-    supported_languages: List[str]
-    strict_mode: bool  # Require exact parameter matches or allow defaults
-
-
-@dataclass
 class ServerConfig:
     """Complete server configuration."""
 
     cad: Dict[str, CADConfig]
     output: OutputConfig
-    nlp: NLPConfig
     logging_level: str = "INFO"
     debug: bool = False
 
@@ -135,11 +125,6 @@ class ConfigManager:
                 directory="~/Documents/multiCAD Exports",
                 format="dwg",
             ),
-            nlp=NLPConfig(
-                default_language="en",
-                supported_languages=["en", "es"],
-                strict_mode=False,
-            ),
             logging_level="INFO",
             debug=False,
         )
@@ -164,18 +149,9 @@ class ConfigManager:
                 format=output_dict.get("format", "dwg"),
             )
 
-            # Parse NLP config
-            nlp_dict = config_dict.get("nlp", {})
-            nlp = NLPConfig(
-                default_language=nlp_dict.get("default_language", "en"),
-                supported_languages=nlp_dict.get("supported_languages", ["en", "zh"]),
-                strict_mode=nlp_dict.get("strict_mode", False),
-            )
-
             return ServerConfig(
                 cad=cad_configs,
                 output=output,
-                nlp=nlp,
                 logging_level=config_dict.get("logging_level", "INFO"),
                 debug=config_dict.get("debug", False),
             )

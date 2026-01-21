@@ -13,7 +13,13 @@ import logging
 from typing import Optional
 
 from mcp.server.fastmcp import Context
+from pydantic import ValidationError
 
+from core.models import (
+    MoveEntityRequest,
+    RotateEntityRequest,
+    ScaleEntityRequest,
+)
 from mcp_tools.decorators import cad_tool, get_current_adapter
 from mcp_tools.helpers import parse_handles
 
@@ -119,13 +125,26 @@ def register_entity_tools(mcp):
         Returns:
             Status message with count of moved entities
         """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().move_entities(handle_list, offset_x, offset_y)
+        try:
+            handle_list = parse_handles(handles)
 
-        if success:
-            return f"Moved {len(handle_list)} entities by ({offset_x}, {offset_y})"
-        else:
-            return "Failed to move entities"
+            # Use Pydantic validation
+            validated = MoveEntityRequest(
+                handles=handle_list, displacement=(offset_x, offset_y)
+            )
+
+            success = get_current_adapter().move_entities(
+                validated.handles, offset_x, offset_y
+            )
+
+            if success:
+                return f"Moved {len(handle_list)} entities by ({offset_x}, {offset_y})"
+            else:
+                return "Failed to move entities"
+        except ValidationError as e:
+            error_msg = f"Validation error: {e.errors()[0]['msg']}"
+            logger.error(f"Validation error moving entities: {error_msg}")
+            return f"Failed to move entities: {error_msg}"
 
     @cad_tool(mcp, "rotate_entities")
     def rotate_entities(
@@ -149,15 +168,26 @@ def register_entity_tools(mcp):
         Returns:
             Status message with count of rotated entities
         """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().rotate_entities(
-            handle_list, center_x, center_y, angle
-        )
+        try:
+            handle_list = parse_handles(handles)
 
-        if success:
-            return f"Rotated {len(handle_list)} entities by {angle}°"
-        else:
-            return "Failed to rotate entities"
+            # Use Pydantic validation
+            validated = RotateEntityRequest(
+                handles=handle_list, base_point=(center_x, center_y), angle=angle
+            )
+
+            success = get_current_adapter().rotate_entities(
+                validated.handles, center_x, center_y, validated.angle
+            )
+
+            if success:
+                return f"Rotated {len(handle_list)} entities by {angle}°"
+            else:
+                return "Failed to rotate entities"
+        except ValidationError as e:
+            error_msg = f"Validation error: {e.errors()[0]['msg']}"
+            logger.error(f"Validation error rotating entities: {error_msg}")
+            return f"Failed to rotate entities: {error_msg}"
 
     @cad_tool(mcp, "scale_entities")
     def scale_entities(
@@ -181,15 +211,28 @@ def register_entity_tools(mcp):
         Returns:
             Status message with count of scaled entities
         """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().scale_entities(
-            handle_list, center_x, center_y, scale_factor
-        )
+        try:
+            handle_list = parse_handles(handles)
 
-        if success:
-            return f"Scaled {len(handle_list)} entities by {scale_factor}x"
-        else:
-            return "Failed to scale entities"
+            # Use Pydantic validation (automatically checks scale_factor > 0)
+            validated = ScaleEntityRequest(
+                handles=handle_list,
+                base_point=(center_x, center_y),
+                scale_factor=scale_factor,
+            )
+
+            success = get_current_adapter().scale_entities(
+                validated.handles, center_x, center_y, validated.scale_factor
+            )
+
+            if success:
+                return f"Scaled {len(handle_list)} entities by {scale_factor}x"
+            else:
+                return "Failed to scale entities"
+        except ValidationError as e:
+            error_msg = f"Validation error: {e.errors()[0]['msg']}"
+            logger.error(f"Validation error scaling entities: {error_msg}")
+            return f"Failed to scale entities: {error_msg}"
 
     @cad_tool(mcp, "copy_entities")
     def copy_entities(
@@ -433,6 +476,71 @@ def register_entity_tools(mcp):
                     "error": f"Invalid JSON input: {str(e)}",
                     "total_changes": 0,
                     "total_moved": 0,
+                    "results": [],
+                },
+                indent=2,
+            )
+
+    @cad_tool(mcp, "set_entities_color_bylayer")
+    def set_entities_color_bylayer(
+        ctx: Context,
+        handles: str,
+        cad_type: Optional[str] = None,
+    ) -> str:
+        """
+        Set entities to use their layer's color (ByLayer).
+
+        Args:
+            handles: JSON array of entity handles, or single handle string
+            cad_type: CAD application to use
+
+        Returns:
+            JSON result with counts and per-entity details
+
+        Example:
+            handles='["A1B2C3", "D4E5F6"]'  # Multiple entities
+            handles='A1B2C3'                 # Single entity
+
+        Note:
+            - Entities will inherit their layer's color
+            - Color value 256 (acByLayer) is assigned
+            - Uses modern TrueColor property
+        """
+        adapter = get_current_adapter()
+
+        try:
+            # Parse handles input
+            if handles.startswith("["):
+                # JSON array
+                handles_list = json.loads(handles)
+            else:
+                # Single handle
+                handles_list = [handles]
+
+            result = adapter.set_entities_color_bylayer(handles_list)
+
+            return json.dumps(result, indent=2)
+
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"Invalid JSON input: {str(e)}",
+                    "total": 0,
+                    "changed": 0,
+                    "failed": 0,
+                    "results": [],
+                },
+                indent=2,
+            )
+        except Exception as e:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": str(e),
+                    "total": 0,
+                    "changed": 0,
+                    "failed": 0,
                     "results": [],
                 },
                 indent=2,

@@ -8,7 +8,6 @@ from .config import (
     ServerConfig,
     CADConfig,
     OutputConfig,
-    NLPConfig,
     get_config,
     get_cad_config,
     get_supported_cads,
@@ -22,7 +21,6 @@ from .exceptions import (
     ColorError,
     LayerError,
     CADNotSupportedError,
-    NLPParseError,
     ConfigError,
 )
 from .cad_interface import (
@@ -39,7 +37,6 @@ __all__ = [
     "ServerConfig",
     "CADConfig",
     "OutputConfig",
-    "NLPConfig",
     "get_config",
     "get_cad_config",
     "get_supported_cads",
@@ -52,7 +49,6 @@ __all__ = [
     "ColorError",
     "LayerError",
     "CADNotSupportedError",
-    "NLPParseError",
     "ConfigError",
     # Interfaces
     "CADInterface",

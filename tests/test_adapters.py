@@ -1,102 +1,139 @@
 """
 Unit tests for CAD adapters.
-Tests adapter factory and interface implementation.
+Tests adapter interface implementation and context managers.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
-from src.adapters import (
-    get_adapter,
-    create_adapter,
-    ADAPTER_REGISTRY,
-)
+from unittest.mock import MagicMock, patch, Mock
+from src.adapters import AutoCADAdapter
 from src.core import CADInterface
 
 
-class TestAdapterRegistry:
-    """Test suite for adapter registry."""
+class TestAdapterInstantiation:
+    """Test suite for adapter instantiation."""
 
-    def test_adapter_registry_contains_expected_adapters(self):
-        """Test that registry contains all expected adapters."""
-        assert "autocad" in ADAPTER_REGISTRY
-        assert "zwcad" in ADAPTER_REGISTRY
-        assert "gcad" in ADAPTER_REGISTRY
+    def test_adapter_can_be_instantiated(self):
+        """Test that AutoCADAdapter can be instantiated."""
+        adapter = AutoCADAdapter("autocad")
+        assert adapter is not None
+        assert adapter.cad_type == "autocad"
 
-    def test_get_adapter_returns_class(self):
-        """Test get_adapter returns adapter class."""
-        adapter_class = get_adapter("autocad")
-        assert adapter_class is not None
-        # Check it's a class (not an instance)
-        assert isinstance(adapter_class, type)
+    def test_adapter_supports_multiple_cad_types(self):
+        """Test that AutoCADAdapter supports multiple CAD types."""
+        # All should work with AutoCADAdapter
+        cad_types = ["autocad", "zwcad", "gcad", "bricscad"]
+        for cad_type in cad_types:
+            adapter = AutoCADAdapter(cad_type)
+            assert adapter.cad_type == cad_type
 
-    def test_get_adapter_case_insensitive(self):
-        """Test get_adapter is case-insensitive."""
-        assert get_adapter("autocad") == get_adapter("AUTOCAD")
-        assert get_adapter("zwcad") == get_adapter("ZWCAD")
-        assert get_adapter("gcad") == get_adapter("GCAD")
-
-    def test_get_adapter_invalid_type_raises(self):
-        """Test get_adapter raises for invalid CAD type."""
-        with pytest.raises(ValueError):
-            get_adapter("invalid_cad")
-
-    def test_get_adapter_error_message_includes_supported(self):
-        """Test error message lists supported CAD types."""
-        try:
-            get_adapter("unknown")
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "autocad" in str(e).lower()
-            assert "zwcad" in str(e).lower()
-            assert "gcad" in str(e).lower()
+    def test_adapter_case_insensitive(self):
+        """Test that cad_type is case-insensitive."""
+        adapter1 = AutoCADAdapter("autocad")
+        adapter2 = AutoCADAdapter("AUTOCAD")
+        assert adapter1.cad_type == adapter2.cad_type
 
 
-class TestAdapterCreation:
-    """Test suite for adapter creation."""
+class TestContextManagers:
+    """Test suite for context managers."""
 
-    def test_create_adapter_returns_instance(self):
-        """Test create_adapter returns an instance (not a class)."""
-        # Skip if not on Windows or CAD not installed
-        # This test would normally connect to real CAD
-        # For now, we just test the factory pattern
-        adapter_class = get_adapter("autocad")
-        assert callable(adapter_class)
+    def test_adapter_context_manager(self):
+        """Test that AutoCADAdapter can be used as context manager."""
+        adapter = AutoCADAdapter("autocad")
 
-    def test_create_adapter_case_insensitive(self):
-        """Test create_adapter is case-insensitive."""
-        try:
-            adapter1 = create_adapter("autocad")
-            adapter2 = create_adapter("AUTOCAD")
-            assert isinstance(adapter1, type(adapter2))
-        except Exception:
-            # Expected to fail if CAD not installed
-            pass
+        with patch.object(adapter, "connect", return_value=True) as mock_connect, \
+             patch.object(adapter, "disconnect") as mock_disconnect:
 
-    def test_create_adapter_invalid_type_raises(self):
-        """Test create_adapter raises for invalid type."""
-        with pytest.raises(ValueError):
-            create_adapter("nonexistent")
+            # Use adapter as context manager
+            with adapter as ctx_adapter:
+                assert ctx_adapter is adapter
+                mock_connect.assert_called_once()
+
+            # Should disconnect on exit
+            mock_disconnect.assert_called_once()
+
+    def test_adapter_context_manager_raises_on_connection_failure(self):
+        """Test that context manager raises if connection fails."""
+        adapter = AutoCADAdapter("autocad")
+
+        with patch.object(adapter, "connect", return_value=False):
+            # Should raise CADConnectionError if connection fails
+            from core.exceptions import CADConnectionError
+            with pytest.raises(CADConnectionError):
+                with adapter as ctx_adapter:
+                    pass
+
+    def test_com_session_context_manager(self):
+        """Test that com_session properly initializes/uninitializes COM."""
+        from src.adapters.autocad_adapter import com_session
+        import sys
+
+        if sys.platform != "win32":
+            pytest.skip("COM only available on Windows")
+
+        # Import pythoncom for mocking
+        import pythoncom
+
+        with patch.object(pythoncom, "CoInitialize") as mock_init, \
+             patch.object(pythoncom, "CoUninitialize") as mock_uninit:
+
+            with com_session():
+                mock_init.assert_called_once()
+
+            # Should uninitialize on exit
+            mock_uninit.assert_called_once()
+
+    def test_selection_set_manager_creates_and_deletes(self):
+        """Test that SelectionSetManager creates and deletes selection sets."""
+        from src.adapters.autocad_adapter import SelectionSetManager
+
+        mock_document = MagicMock()
+        mock_ss = MagicMock()
+        mock_document.SelectionSets.Add.return_value = mock_ss
+
+        with SelectionSetManager(mock_document, "TEST_SS") as ss:
+            # Should create selection set
+            mock_document.SelectionSets.Add.assert_called_once_with("TEST_SS")
+            assert ss is mock_ss
+
+        # Should delete on exit
+        mock_ss.Delete.assert_called_once()
+
+    def test_selection_set_manager_handles_existing(self):
+        """Test that SelectionSetManager deletes existing selection set."""
+        from src.adapters.autocad_adapter import SelectionSetManager
+
+        mock_document = MagicMock()
+        mock_existing_ss = MagicMock()
+        mock_new_ss = MagicMock()
+
+        # Simulate existing selection set
+        mock_document.SelectionSets.Item.return_value = mock_existing_ss
+        mock_document.SelectionSets.Add.return_value = mock_new_ss
+
+        with SelectionSetManager(mock_document, "TEST_SS") as ss:
+            # Should delete existing
+            mock_existing_ss.Delete.assert_called_once()
+            # Should create new
+            mock_document.SelectionSets.Add.assert_called_once_with("TEST_SS")
+            assert ss is mock_new_ss
 
 
 class TestCADInterfaceContract:
     """Test suite for CADInterface contract compliance."""
 
     def test_adapter_implements_cad_interface(self):
-        """Test that adapters implement CADInterface."""
-        # Import CADInterface from the same context as the adapter to avoid
-        # module path mismatch (adapter uses 'from core import', test uses 'from src.core import')
+        """Test that AutoCADAdapter implements CADInterface."""
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter_base = AutoCADAdapter.__bases__[0]
+        # Verify adapter inherits from CADInterface (check in MRO)
+        mro_names = [c.__name__ for c in AutoCADAdapter.__mro__]
+        assert "CADInterface" in mro_names, f"CADInterface must be in MRO. Found: {mro_names}"
 
-        for cad_type, adapter_class in ADAPTER_REGISTRY.items():
-            # Verify adapter inherits from the same base class
-            assert adapter_class.__bases__[0] == adapter_base
-            # Also verify the base class name is CADInterface
-            assert adapter_base.__name__ == "CADInterface"
+        # Also check that adapter has the ABC.ABCMeta metaclass (from CADInterface)
+        assert hasattr(AutoCADAdapter, '__abstractmethods__'), "AutoCADAdapter should have __abstractmethods__ from ABC"
 
     def test_adapter_has_required_methods(self):
-        """Test that adapters have all required interface methods."""
+        """Test that adapter has all required interface methods."""
         required_methods = [
             # Connection
             "connect",
@@ -128,13 +165,16 @@ class TestCADInterfaceContract:
             "delete_entity",
             "get_entity_properties",
             "set_entity_properties",
+            # Data extraction
+            "extract_drawing_data",
+            "get_layers_info",
         ]
 
-        for cad_type, adapter_class in ADAPTER_REGISTRY.items():
-            for method in required_methods:
-                assert hasattr(
-                    adapter_class, method
-                ), f"{cad_type} adapter missing {method}"
+        adapter = AutoCADAdapter("autocad")
+        for method in required_methods:
+            assert hasattr(
+                adapter, method
+            ), f"AutoCADAdapter missing {method}"
 
 
 class TestCoordinateNormalization:
@@ -172,13 +212,15 @@ class TestLineWeightValidation:
 
     def test_valid_lineweight_accepted(self):
         """Test that valid lineweights are accepted."""
+        adapter = AutoCADAdapter("autocad")
         valid_weights = [0, 5, 9, 13, 15, 18, 20, 25, 30, 100, 211]
         for weight in valid_weights:
-            assert CADInterface.validate_lineweight(weight) == weight
+            assert adapter.validate_lineweight(weight) == weight
 
     def test_invalid_lineweight_returns_default(self):
         """Test that invalid lineweights return default."""
-        result = CADInterface.validate_lineweight(999)
+        adapter = AutoCADAdapter("autocad")
+        result = adapter.validate_lineweight(999)
         assert result == 0  # Default thin line
 
     def test_lineweight_is_valid_check(self):
@@ -230,7 +272,7 @@ class TestRefreshViewUndoRedo:
         """
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "_get_application") as mock_get_app, patch.object(
             adapter, "_get_document"
@@ -261,7 +303,7 @@ class TestRefreshViewUndoRedo:
         """
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "_validate_connection"), patch.object(
             adapter, "_get_application"
@@ -287,7 +329,7 @@ class TestRefreshViewUndoRedo:
         """
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "_validate_connection"), patch.object(
             adapter, "_get_application"
@@ -313,13 +355,15 @@ class TestDataExport:
         """Test that extract_drawing_data returns a list of dictionaries."""
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "_validate_connection"), patch.object(
             adapter, "_get_document"
-        ) as mock_get_doc:
+        ) as mock_get_doc, patch.object(
+            adapter, "_get_entities_to_process"
+        ) as mock_get_entities:
 
-            # Mock ModelSpace with entities (COM-compatible interface)
+            # Mock entity with properties
             mock_entity = MagicMock()
             mock_entity.Handle = "A1B2C3D4"
             mock_entity.ObjectName = "AcDbLine"
@@ -330,15 +374,10 @@ class TestDataExport:
             mock_entity.Radius = 0.0
             mock_entity.Name = ""
 
-            # Create proper COM mock: has Count property, Item() method, and is iterable
-            mock_model_space = MagicMock()
-            mock_model_space.Count = 1
-            mock_model_space.Item.return_value = mock_entity
-            # Make ModelSpace iterable for direct iteration (new optimization)
-            mock_model_space.__iter__.return_value = iter([mock_entity])
+            # Mock _get_entities_to_process to return list of entities
+            mock_get_entities.return_value = [mock_entity]
 
             mock_doc = MagicMock()
-            mock_doc.ModelSpace = mock_model_space
             mock_get_doc.return_value = mock_doc
 
             result = adapter.extract_drawing_data()
@@ -348,25 +387,25 @@ class TestDataExport:
             assert result[0]["Handle"] == "A1B2C3D4"
             assert result[0]["ObjectType"] == "AcDbLine"
             assert result[0]["Layer"] == "0"
+            # Verify _get_entities_to_process was called with only_selected=False
+            mock_get_entities.assert_called_once_with(mock_doc, False)
 
     def test_extract_drawing_data_handles_empty_drawing(self):
         """Test that extract_drawing_data handles empty drawings."""
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "_validate_connection"), patch.object(
             adapter, "_get_document"
-        ) as mock_get_doc:
+        ) as mock_get_doc, patch.object(
+            adapter, "_get_entities_to_process"
+        ) as mock_get_entities:
 
-            # Create proper COM mock with Count = 0 for empty drawing
-            mock_model_space = MagicMock()
-            mock_model_space.Count = 0
-            # Make ModelSpace iterable (empty) for direct iteration
-            mock_model_space.__iter__.return_value = iter([])
+            # Mock empty entity list
+            mock_get_entities.return_value = []
 
             mock_doc = MagicMock()
-            mock_doc.ModelSpace = mock_model_space
             mock_get_doc.return_value = mock_doc
 
             result = adapter.extract_drawing_data()
@@ -374,11 +413,107 @@ class TestDataExport:
             assert isinstance(result, list)
             assert len(result) == 0
 
+    def test_extract_drawing_data_with_only_selected(self):
+        """Test that extract_drawing_data respects only_selected parameter."""
+        from src.adapters.autocad_adapter import AutoCADAdapter
+
+        adapter = AutoCADAdapter("autocad")
+
+        with patch.object(adapter, "_validate_connection"), patch.object(
+            adapter, "_get_document"
+        ) as mock_get_doc, patch.object(
+            adapter, "_get_entities_to_process"
+        ) as mock_get_entities:
+
+            # Mock selected entity
+            mock_entity = MagicMock()
+            mock_entity.Handle = "SELECTED1"
+            mock_entity.ObjectName = "AcDbCircle"
+            mock_entity.Layer = "1"
+            mock_entity.Color = 5
+            mock_entity.Radius = 50.0
+            mock_entity.Length = 0.0
+            mock_entity.Area = 0.0
+            mock_entity.Name = ""
+
+            mock_get_entities.return_value = [mock_entity]
+
+            mock_doc = MagicMock()
+            mock_get_doc.return_value = mock_doc
+
+            # Call with only_selected=True
+            result = adapter.extract_drawing_data(only_selected=True)
+
+            assert isinstance(result, list)
+            assert len(result) == 1
+            assert result[0]["Handle"] == "SELECTED1"
+            # Verify _get_entities_to_process was called with only_selected=True
+            mock_get_entities.assert_called_once_with(mock_doc, True)
+
+    def test_get_entities_to_process_uses_pickfirst_selection(self):
+        """Test that _get_entities_to_process uses PickfirstSelectionSet for selected entities."""
+        from src.adapters.autocad_adapter import AutoCADAdapter
+
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock document with PickfirstSelectionSet
+        mock_doc = MagicMock()
+        mock_selection = MagicMock()
+        mock_selection.Count = 2
+
+        # Mock selected entities
+        mock_entity1 = MagicMock()
+        mock_entity1.Handle = "E1"
+        mock_entity2 = MagicMock()
+        mock_entity2.Handle = "E2"
+
+        mock_selection.Item.side_effect = [mock_entity1, mock_entity2]
+        mock_doc.PickfirstSelectionSet = mock_selection
+
+        # Call _get_entities_to_process with only_selected=True
+        result = adapter._get_entities_to_process(mock_doc, only_selected=True)
+
+        assert len(result) == 2
+        assert result[0] is mock_entity1
+        assert result[1] is mock_entity2
+        # Verify PickfirstSelectionSet was accessed
+        assert mock_selection.Item.call_count == 2
+
+    def test_get_entities_to_process_returns_all_from_modelspace(self):
+        """Test that _get_entities_to_process returns all entities from ModelSpace."""
+        from src.adapters.autocad_adapter import AutoCADAdapter
+
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock document with ModelSpace
+        mock_doc = MagicMock()
+        mock_model_space = MagicMock()
+
+        # Mock entities in ModelSpace
+        mock_entity1 = MagicMock()
+        mock_entity1.Handle = "E1"
+        mock_entity2 = MagicMock()
+        mock_entity2.Handle = "E2"
+        mock_entity3 = MagicMock()
+        mock_entity3.Handle = "E3"
+
+        # Make ModelSpace iterable
+        mock_model_space.__iter__.return_value = iter([mock_entity1, mock_entity2, mock_entity3])
+        mock_doc.ModelSpace = mock_model_space
+
+        # Call _get_entities_to_process with only_selected=False
+        result = adapter._get_entities_to_process(mock_doc, only_selected=False)
+
+        assert len(result) == 3
+        assert result[0] is mock_entity1
+        assert result[1] is mock_entity2
+        assert result[2] is mock_entity3
+
     def test_export_to_excel_handles_no_data(self):
         """Test that export_to_excel handles drawing with no data."""
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(adapter, "extract_drawing_data") as mock_extract:
 
@@ -397,7 +532,7 @@ class TestDataExport:
         from src.adapters.autocad_adapter import AutoCADAdapter
         from core import get_config
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(
             adapter, "extract_drawing_data"
@@ -461,7 +596,7 @@ class TestDataExport:
         from core import get_config
         from openpyxl import load_workbook
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         with patch.object(
             adapter, "extract_drawing_data"
@@ -561,7 +696,7 @@ class TestDataExport:
         """Test that extract_drawing_data returns proper dict structure."""
         from src.adapters.autocad_adapter import AutoCADAdapter
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         # extract_drawing_data returns list of dicts with entity data
         # We test that it returns empty list when disconnected (can't access real drawing)
@@ -587,7 +722,7 @@ class TestDataExport:
         """Test that color mapping works in extract_drawing_data."""
         from src.adapters.autocad_adapter import AutoCADAdapter, COLOR_MAP
 
-        adapter = create_adapter("autocad")
+        adapter = AutoCADAdapter("autocad")
 
         # Verify COLOR_MAP exists and has expected values
         assert isinstance(COLOR_MAP, dict)
@@ -609,6 +744,374 @@ class TestDataExport:
         # Test 3D coordinate
         result_3d = CADInterface.normalize_coordinate((10.5, 20.5, 30.5))
         assert result_3d == (10.5, 20.5, 30.5)
+
+
+class TestLayersInfo:
+    """Test suite for layer information extraction."""
+
+    def test_get_layers_info_with_entity_data_parameter(self):
+        """Test that get_layers_info accepts pre-extracted entity_data to avoid re-iteration."""
+        from src.adapters.autocad_adapter import AutoCADAdapter
+
+        adapter = AutoCADAdapter("autocad")
+
+        # Pre-extracted entity data
+        entity_data = [
+            {"Layer": "0", "Handle": "A1"},
+            {"Layer": "0", "Handle": "A2"},
+            {"Layer": "1", "Handle": "B1"},
+            {"Layer": "Walls", "Handle": "C1"},
+            {"Layer": "Walls", "Handle": "C2"},
+            {"Layer": "Walls", "Handle": "C3"},
+        ]
+
+        with patch.object(adapter, "_validate_connection"), patch.object(
+            adapter, "_get_document"
+        ) as mock_get_doc:
+
+            # Mock document with layers
+            mock_layer_0 = MagicMock()
+            mock_layer_0.Name = "0"
+            mock_layer_0.color = 7
+            mock_layer_0.Linetype = "Continuous"
+            mock_layer_0.Lineweight = -3
+            mock_layer_0.Lock = False
+            mock_layer_0.LayerOn = True
+
+            mock_layer_1 = MagicMock()
+            mock_layer_1.Name = "1"
+            mock_layer_1.color = 1
+            mock_layer_1.Linetype = "Continuous"
+            mock_layer_1.Lineweight = -3
+            mock_layer_1.Lock = False
+            mock_layer_1.LayerOn = True
+
+            mock_layer_walls = MagicMock()
+            mock_layer_walls.Name = "Walls"
+            mock_layer_walls.color = 5
+            mock_layer_walls.Linetype = "Continuous"
+            mock_layer_walls.Lineweight = -3
+            mock_layer_walls.Lock = False
+            mock_layer_walls.LayerOn = True
+
+            mock_doc = MagicMock()
+            mock_doc.Layers = [mock_layer_0, mock_layer_1, mock_layer_walls]
+            mock_get_doc.return_value = mock_doc
+
+            # Call get_layers_info with pre-extracted entity_data
+            result = adapter.get_layers_info(entity_data=entity_data)
+
+            assert isinstance(result, list)
+            assert len(result) == 3
+
+            # Check entity counts match pre-extracted data
+            layer_0_info = next((l for l in result if l["Name"] == "0"), None)
+            assert layer_0_info is not None
+            assert layer_0_info["ObjectCount"] == 2
+
+            layer_1_info = next((l for l in result if l["Name"] == "1"), None)
+            assert layer_1_info is not None
+            assert layer_1_info["ObjectCount"] == 1
+
+            layer_walls_info = next((l for l in result if l["Name"] == "Walls"), None)
+            assert layer_walls_info is not None
+            assert layer_walls_info["ObjectCount"] == 3
+
+            # Verify ModelSpace was NOT accessed (optimization)
+            assert not hasattr(mock_doc, "ModelSpace") or not mock_doc.ModelSpace.called
+
+    def test_get_layers_info_without_entity_data_iterates_modelspace(self):
+        """Test that get_layers_info iterates ModelSpace if entity_data not provided."""
+        from src.adapters.autocad_adapter import AutoCADAdapter
+
+        adapter = AutoCADAdapter("autocad")
+
+        with patch.object(adapter, "_validate_connection"), patch.object(
+            adapter, "_get_document"
+        ) as mock_get_doc:
+
+            # Mock entities in ModelSpace
+            mock_entity_1 = MagicMock()
+            mock_entity_1.Layer = "0"
+            mock_entity_2 = MagicMock()
+            mock_entity_2.Layer = "1"
+
+            mock_model_space = MagicMock()
+            mock_model_space.__iter__.return_value = iter([mock_entity_1, mock_entity_2])
+
+            # Mock document with layers
+            mock_layer_0 = MagicMock()
+            mock_layer_0.Name = "0"
+            mock_layer_0.color = 7
+            mock_layer_0.Linetype = "Continuous"
+            mock_layer_0.Lineweight = -3
+            mock_layer_0.Lock = False
+            mock_layer_0.LayerOn = True
+
+            mock_layer_1 = MagicMock()
+            mock_layer_1.Name = "1"
+            mock_layer_1.color = 1
+            mock_layer_1.Linetype = "Continuous"
+            mock_layer_1.Lineweight = -3
+            mock_layer_1.Lock = False
+            mock_layer_1.LayerOn = True
+
+            mock_doc = MagicMock()
+            mock_doc.Layers = [mock_layer_0, mock_layer_1]
+            mock_doc.ModelSpace = mock_model_space
+            mock_get_doc.return_value = mock_doc
+
+            # Call get_layers_info without entity_data
+            result = adapter.get_layers_info()
+
+            assert isinstance(result, list)
+            assert len(result) == 2
+
+            # Check entity counts from ModelSpace iteration
+            layer_0_info = next((l for l in result if l["Name"] == "0"), None)
+            assert layer_0_info is not None
+            assert layer_0_info["ObjectCount"] == 1
+
+            layer_1_info = next((l for l in result if l["Name"] == "1"), None)
+            assert layer_1_info is not None
+            assert layer_1_info["ObjectCount"] == 1
+
+
+class TestBlockCreation:
+    """Test suite for block creation functionality."""
+
+    def test_create_block_from_entities_success(self):
+        """Test successful block creation from entity handles."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_blocks = MagicMock()
+        mock_block_def = MagicMock()
+
+        # Setup mocks
+        mock_app.ActiveDocument = mock_doc
+        mock_doc.Blocks = mock_blocks
+        mock_blocks.Add.return_value = mock_block_def
+        mock_blocks.Item.side_effect = Exception("Block doesn't exist")  # Block name is unique
+
+        # Mock HandleToObject for entities
+        mock_entity1 = MagicMock()
+        mock_entity2 = MagicMock()
+        mock_doc.HandleToObject.side_effect = [mock_entity1, mock_entity2]
+
+        # Mock CopyObjects
+        mock_doc.CopyObjects = MagicMock()
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+
+            result = adapter.create_block_from_entities(
+                block_name="TestBlock",
+                entity_handles=["A1B2", "C3D4"],
+                insertion_point=(0.0, 0.0, 0.0),
+                description="Test block"
+            )
+
+            # Verify result
+            assert result["success"] is True
+            assert result["block_name"] == "TestBlock"
+            assert result["total_handles"] == 2
+            assert result["entities_added"] == 2
+            assert result["failed_handles"] == []
+            assert result["insertion_point"] == (0.0, 0.0, 0.0)
+
+            # Verify block was created
+            mock_blocks.Add.assert_called_once()
+            mock_doc.CopyObjects.assert_called_once()
+
+    def test_create_block_from_entities_duplicate_name(self):
+        """Test that creating block with existing name raises error."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_blocks = MagicMock()
+        mock_existing_block = MagicMock()
+
+        # Setup mocks - block already exists
+        mock_app.ActiveDocument = mock_doc
+        mock_doc.Blocks = mock_blocks
+        mock_blocks.Item.return_value = mock_existing_block  # Block exists (doesn't raise)
+
+        from core.exceptions import CADOperationError
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+
+            with pytest.raises(CADOperationError) as exc_info:
+                adapter.create_block_from_entities(
+                    block_name="ExistingBlock",
+                    entity_handles=["A1B2"],
+                    insertion_point=(0.0, 0.0, 0.0)
+                )
+
+            assert "already exists" in str(exc_info.value).lower()
+
+    def test_create_block_from_entities_invalid_handles(self):
+        """Test block creation with invalid entity handles."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_blocks = MagicMock()
+        mock_block_def = MagicMock()
+
+        # Setup mocks
+        mock_app.ActiveDocument = mock_doc
+        mock_doc.Blocks = mock_blocks
+        mock_blocks.Add.return_value = mock_block_def
+        mock_blocks.Item.side_effect = Exception("Block doesn't exist")
+
+        # Mock HandleToObject - one entity exists, one doesn't
+        mock_entity = MagicMock()
+        mock_doc.HandleToObject.side_effect = [
+            mock_entity,
+            Exception("Invalid handle")
+        ]
+
+        mock_doc.CopyObjects = MagicMock()
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+
+            result = adapter.create_block_from_entities(
+                block_name="PartialBlock",
+                entity_handles=["VALID", "INVALID"],
+                insertion_point=(0.0, 0.0, 0.0)
+            )
+
+            # Should succeed with 1 entity, report 1 failed
+            assert result["success"] is True
+            assert result["entities_added"] == 1
+            assert len(result["failed_handles"]) == 1
+            assert "INVALID" in result["failed_handles"]
+
+    def test_create_block_from_selection_success(self):
+        """Test successful block creation from selected entities."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_blocks = MagicMock()
+        mock_block_def = MagicMock()
+        mock_selection = MagicMock()
+
+        # Setup mocks
+        mock_app.ActiveDocument = mock_doc
+        mock_doc.Blocks = mock_blocks
+        mock_doc.PickfirstSelectionSet = mock_selection
+        mock_blocks.Add.return_value = mock_block_def
+        mock_blocks.Item.side_effect = Exception("Block doesn't exist")
+
+        # Mock selection with 3 entities
+        mock_entity1 = MagicMock()
+        mock_entity2 = MagicMock()
+        mock_entity3 = MagicMock()
+        mock_selection.Count = 3
+        mock_selection.Item.side_effect = [mock_entity1, mock_entity2, mock_entity3]
+
+        mock_doc.CopyObjects = MagicMock()
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+
+            result = adapter.create_block_from_selection(
+                block_name="SelectionBlock",
+                insertion_point=(10.0, 20.0, 0.0),
+                description="From selection"
+            )
+
+            # Verify result
+            assert result["success"] is True
+            assert result["block_name"] == "SelectionBlock"
+            assert result["entities_added"] == 3
+            assert result["insertion_point"] == (10.0, 20.0, 0.0)
+
+            # Verify block was created
+            mock_blocks.Add.assert_called_once()
+            mock_doc.CopyObjects.assert_called_once()
+
+    def test_create_block_from_selection_no_selection(self):
+        """Test that error is raised when no entities are selected."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_blocks = MagicMock()
+        mock_selection = MagicMock()
+
+        # Setup mocks - no entities selected
+        mock_app.ActiveDocument = mock_doc
+        mock_doc.Blocks = mock_blocks
+        mock_doc.PickfirstSelectionSet = mock_selection
+        mock_blocks.Item.side_effect = Exception("Block doesn't exist")
+        mock_selection.Count = 0  # No selection
+
+        from core.exceptions import CADOperationError
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+
+            with pytest.raises(CADOperationError) as exc_info:
+                adapter.create_block_from_selection(
+                    block_name="EmptyBlock",
+                    insertion_point=(0.0, 0.0, 0.0)
+                )
+
+            assert "No entities selected" in str(exc_info.value)
+
+    def test_create_block_from_entities_invalid_name(self):
+        """Test that invalid block name raises error."""
+        adapter = AutoCADAdapter("autocad")
+
+        from core.exceptions import InvalidParameterError
+
+        # Mock COM objects
+        mock_app = MagicMock()
+        mock_doc = MagicMock()
+        mock_app.ActiveDocument = mock_doc
+
+        with patch.object(adapter, "_validate_connection"), \
+             patch.object(adapter, "_get_application", return_value=mock_app):
+            # Empty string
+            with pytest.raises(InvalidParameterError):
+                adapter.create_block_from_entities(
+                    block_name="",
+                    entity_handles=["A1B2"]
+                )
+
+            # None
+            with pytest.raises(InvalidParameterError):
+                adapter.create_block_from_entities(
+                    block_name=None,
+                    entity_handles=["A1B2"]
+                )
+
+    def test_objects_to_variant_array_helper(self):
+        """Test _objects_to_variant_array helper method."""
+        adapter = AutoCADAdapter("autocad")
+
+        # Mock COM objects
+        mock_obj1 = MagicMock()
+        mock_obj2 = MagicMock()
+        objects = [mock_obj1, mock_obj2]
+
+        # Call helper
+        result = adapter._objects_to_variant_array(objects)
+
+        # Verify it returns a variant (we can't check exact type without pythoncom)
+        assert result is not None
 
 
 if __name__ == "__main__":

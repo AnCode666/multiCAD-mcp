@@ -343,6 +343,108 @@ class CADInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    def draw_spline(
+        self,
+        points: List[Coordinate],
+        closed: bool = False,
+        degree: int = 3,
+        layer: str = "0",
+        color: str | int = "white",
+        lineweight: int = 0,
+        _skip_refresh: bool = False,
+    ) -> str:
+        """
+        Draw a spline curve through points.
+
+        Args:
+            points: List of control points (minimum 2)
+            closed: Whether the spline should be closed
+            degree: Degree of the spline (1-3, default 3 = cubic)
+            layer: Layer name
+            color: Color name or index
+            lineweight: Line weight value
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+
+        Returns:
+            str: Entity handle/ID
+        """
+        pass
+
+    # ========== Array Operations ==========
+
+    @abstractmethod
+    def create_rectangular_array(
+        self,
+        handles: List[str],
+        rows: int,
+        columns: int,
+        row_spacing: float,
+        column_spacing: float,
+    ) -> List[str]:
+        """
+        Create a rectangular array of entities.
+
+        Args:
+            handles: Entity handles to array
+            rows: Number of rows
+            columns: Number of columns
+            row_spacing: Distance between rows
+            column_spacing: Distance between columns
+
+        Returns:
+            List[str]: Handles of all created copies
+        """
+        pass
+
+    @abstractmethod
+    def create_polar_array(
+        self,
+        handles: List[str],
+        center_x: float,
+        center_y: float,
+        count: int,
+        angle_to_fill: float = 360.0,
+        rotate_items: bool = True,
+    ) -> List[str]:
+        """
+        Create a polar (circular) array of entities.
+
+        Args:
+            handles: Entity handles to array
+            center_x: X coordinate of rotation center
+            center_y: Y coordinate of rotation center
+            count: Number of items in the array
+            angle_to_fill: Total angle to fill (default: 360 degrees)
+            rotate_items: Whether to rotate items as they are copied
+
+        Returns:
+            List[str]: Handles of all created copies
+        """
+        pass
+
+    @abstractmethod
+    def create_path_array(
+        self,
+        handles: List[str],
+        path_points: List[Coordinate],
+        count: int,
+        align_items: bool = True,
+    ) -> List[str]:
+        """
+        Create an array of entities along a path.
+
+        Args:
+            handles: Entity handles to array
+            path_points: Points defining the path
+            count: Number of items in the array
+            align_items: Whether to align items to path direction
+
+        Returns:
+            List[str]: Handles of all created copies
+        """
+        pass
+
     # ========== Layer Management ==========
 
     @abstractmethod
@@ -477,6 +579,40 @@ class CADInterface(ABC):
 
         Raises:
             LayerError: If layer not found
+        """
+        pass
+
+    @abstractmethod
+    def set_layer_color(self, layer_name: str, color: str | int) -> bool:
+        """
+        Set the color of a layer.
+
+        Args:
+            layer_name: Name of the layer to modify
+            color: Color name (from COLOR_MAP) or ACI index (1-255)
+
+        Returns:
+            bool: True if successful
+
+        Raises:
+            LayerError: If layer not found
+            ColorError: If color is invalid
+        """
+        pass
+
+    @abstractmethod
+    def set_entities_color_bylayer(self, handles: List[str]) -> Dict[str, Any]:
+        """
+        Set entities to use their layer's color (ByLayer).
+
+        Args:
+            handles: List of entity handles to modify
+
+        Returns:
+            dict: Result summary with counts and details
+
+        Raises:
+            CADOperationError: If operation fails
         """
         pass
 
@@ -688,6 +824,60 @@ class CADInterface(ABC):
         """
         pass
 
+    # ========== Block Creation ==========
+
+    @abstractmethod
+    def create_block_from_entities(
+        self,
+        block_name: str,
+        entity_handles: List[str],
+        insertion_point: Coordinate = (0.0, 0.0, 0.0),
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Create a block from specified entities.
+
+        Args:
+            block_name: Name for the new block
+            entity_handles: List of entity handles to include in block
+            insertion_point: Base point for block definition (default: 0,0,0)
+            description: Optional block description
+
+        Returns:
+            Dict[str, Any]: Dictionary with operation status and details
+                - success: bool
+                - block_name: str
+                - total_handles: int
+                - entities_added: int
+                - failed_handles: List[str]
+                - insertion_point: Tuple[float, float, float]
+        """
+        pass
+
+    @abstractmethod
+    def create_block_from_selection(
+        self,
+        block_name: str,
+        insertion_point: Coordinate = (0.0, 0.0, 0.0),
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Create a block from currently selected entities.
+
+        Args:
+            block_name: Name for the new block
+            insertion_point: Base point for block definition (default: 0,0,0)
+            description: Optional block description
+
+        Returns:
+            Dict[str, Any]: Dictionary with operation status and details
+                - success: bool
+                - block_name: str
+                - entities_added: int
+                - insertion_point: Tuple[float, float, float]
+        """
+        pass
+
     # ========== Entity Manipulation ==========
 
     @abstractmethod
@@ -846,8 +1036,7 @@ class CADInterface(ABC):
         else:
             raise ValueError(f"Invalid coordinate: {coord}")
 
-    @staticmethod
-    def validate_lineweight(weight: int) -> int:
+    def validate_lineweight(self, weight: int) -> int:
         """
         Validate and return a proper lineweight value.
 

@@ -12,6 +12,9 @@ openpyxl>=3.1.0
 # Python 3.10+ type hints and utilities
 typing-extensions>=4.5.0
 
+# Data validation and settings management
+pydantic>=2.0.0
+
 # Development/Testing (optional, for tests)
 pytest>=7.0.0
 pytest-cov>=4.0.0

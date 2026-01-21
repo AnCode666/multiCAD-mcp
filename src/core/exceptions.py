@@ -80,15 +80,6 @@ class CADNotSupportedError(MultiCADError):
         )
 
 
-class NLPParseError(MultiCADError):
-    """Raised when NLP parsing fails or produces ambiguous results."""
-
-    def __init__(self, command: str, reason: str):
-        self.command = command
-        self.reason = reason
-        super().__init__(f"Failed to parse command '{command}': {reason}")
-
-
 class ConfigError(MultiCADError):
     """Raised when configuration is invalid or missing."""
 

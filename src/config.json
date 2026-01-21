@@ -26,10 +26,5 @@
   "output": {
     "directory": "~/Documents/multiCAD Exports",
     "format": "dwg"
-  },
-  "nlp": {
-    "default_language": "en",
-    "supported_languages": ["en", "es"],
-    "strict_mode": false
   }
 }

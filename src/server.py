@@ -14,7 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from __version__ import __version__, __title__
 from core import get_supported_cads
 from mcp_tools.helpers import setup_utf8_encoding, setup_logging
-from mcp_tools.adapter_manager import auto_detect_cad
+from adapters.adapter_manager import auto_detect_cad
 from mcp_tools.tools import (
     register_connection_tools,
     register_drawing_tools,
@@ -22,9 +22,9 @@ from mcp_tools.tools import (
     register_file_tools,
     register_entity_tools,
     register_simple_tools,
-    register_nlp_tools,
     register_export_tools,
     register_debug_tools,
+    register_block_tools,
 )
 
 # Setup at module load
@@ -44,8 +44,9 @@ def register_all_tools():
     - Layer management
     - File operations
     - Entity selection and manipulation
+    - Block management
     - Simple view and history tools
-    - Natural language command execution
+    - Export and data extraction
     - Debug and diagnostic tools
     """
     logger.info("Registering MCP tools...")
@@ -64,12 +65,12 @@ def register_all_tools():
 
     register_entity_tools(mcp)
     logger.debug("  ✓ Entity tools registered")
+    
+    register_block_tools(mcp)
+    logger.debug("  ✓ Block tools registered")
 
     register_simple_tools(mcp)
     logger.debug("  ✓ Simple tools registered")
-
-    register_nlp_tools(mcp)
-    logger.debug("  ✓ NLP tools registered")
 
     register_export_tools(mcp)
     logger.debug("  ✓ Export tools registered")

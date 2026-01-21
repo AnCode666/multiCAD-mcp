@@ -1,257 +1,260 @@
 # 02 - Architecture
 
-Overview of how multiCAD-mcp is organized and how components interact.
+## Overview
 
-## Three-Layer Architecture
-
-```text
+```
 ┌─────────────────────────────────────┐
 │  FastMCP Server (server.py)         │
-│     MCP tools, tool schemas         │
+│     54 MCP tools                    │
 └──────────────┬──────────────────────┘
                │
-       ┌───────┴──────────┬─────────────┐
-       │                  │             │
-       ▼                  ▼             ▼
-┌────────────────┐  ┌──────────────┐  ┌──────────────┐
-│ NLP Processor  │  │ CAD Manager  │  │ Config       │
-│ (nlp/)         │  │ (adapters/)  │  │ (core/)      │
-└────────────────┘  └──────┬───────┘  └──────────────┘
-                           │
-                           ▼
-                  ┌────────────────────┐
-                  │ AutoCADAdapter     │
-                  │ (Factory Pattern)  │
-                  │ - cad_type param   │
-                  └────────┬───────────┘
-                           │
-         ┌─────────────────┼─────────────────┬─────────────┐
-         │                 │                 │             │
-    AutoCAD           ZWCAD              GstarCAD      BricsCAD
-    (prog_id:        (prog_id:          (prog_id:    (prog_id:
-     AutoCAD.        ZWCAD.             GCAD.        BricscadApp.
-     Application)    Application)       Application) AcadApplication)
-         │                 │                 │             │
-         └─────────────────┼─────────────────┴─────────────┘
-                           ▼
-              ┌──────────────────────┐
-              │  Windows COM Layer   │
-              │  (pywin32, pythoncom)│
-              └──────────────────────┘
-                         ▼
-              ┌──────────────────────┐
-              │  CAD Application     │
-              │  (All Compatible)    │
-              └──────────────────────┘
+       ┌───────┴──────────┐
+       │                  │
+       ▼                  ▼
+┌──────────────┐  ┌──────────────┐
+│ Tools Layer  │  │ Config       │
+│ (mcp_tools/) │  │ (core/)      │
+└──────┬───────┘  └──────────────┘
+       │
+       ▼
+┌────────────────────────────────────┐
+│  AutoCADAdapter (Mixin Composition)│
+│  ├── UtilityMixin                  │
+│  ├── ConnectionMixin               │
+│  ├── DrawingMixin                  │
+│  ├── LayerMixin                    │
+│  ├── ... (11 mixins total)         │
+│  └── CADInterface (ABC)            │
+└────────────────┬───────────────────┘
+                 │
+    ┌────────────┼────────────┬──────────────┐
+    │            │            │              │
+ AutoCAD      ZWCAD      GstarCAD      BricsCAD
+    │            │            │              │
+    └────────────┼────────────┴──────────────┘
+                 ▼
+        Windows COM Layer (pywin32)
 ```
 
-## Core Components
+---
 
-### 1. FastMCP Server (`server.py`)
+## Components
 
-**Role**: Entry point that registers and orchestrates all tools.
+### 1. Server (`server.py`)
 
-- Initializes FastMCP with 46 MCP tools
-- Tools organized into 9 categories (connection, drawing, entities, files, layers, nlp, simple, debug, export)
-- Handles auto-detection of connected CAD applications on startup
-- Lean entry point that delegates to mcp_tools modules
+Entry point that registers 54 MCP tools via FastMCP. Auto-detects CAD on startup.
 
-### 2. Server Infrastructure (`mcp_tools/`)
+### 2. Tools (`mcp_tools/tools/`)
 
-**Modules**:
+8 modules with 54 tools:
 
-- **constants.py**: Color maps, selection set names, timing defaults
-- **helpers.py**: Parsing, logging setup, message formatting, result formatting
-- **decorators.py**: `@cad_tool` decorator for unified error handling
-- **adapter_manager.py**: Adapter lifecycle, caching, auto-detection
+| Module | Tools | Purpose |
+|--------|-------|---------|
+| connection.py | 4 | Connect/disconnect, status |
+| drawing.py | 10 | Draw shapes, create blocks |
+| blocks.py | 5 | Block management |
+| layers.py | 8 | Layer management |
+| files.py | 5 | Save, open, close |
+| entities.py | 13 | Select, move, rotate, scale |
+| simple.py | 3 | Zoom, undo, redo |
+| export.py | 4 | Excel export |
+| debug.py | 2 | Diagnostics |
 
-**Key Pattern**: Tools use `@cad_tool(mcp, operation_name)` decorator which:
+### 3. Adapter (`adapters/`)
 
-1. Resolves correct adapter based on `cad_type` parameter
-2. Injects adapter into global `_current_adapter` variable
-3. Wraps with try/catch for consistent error handling
+**Mixin-based architecture** - The adapter was refactored from a 3,198-line monolithic file to a composite class using 11 specialized mixins:
 
-### 3. MCP Tools (`mcp_tools/tools/`)
-
-**9 Tool Modules** (46 tools total):
-
-- **connection.py**: Connect/disconnect CAD, check status, list supported apps
-- **drawing.py**: Draw lines, circles, rectangles, polylines, text, dimensions
-- **entities.py**: Select by color/layer/type, move, rotate, scale, copy, paste
-- **files.py**: Save/open drawings, manage open files
-- **layers.py**: Create, list, delete, rename layers; toggle visibility
-- **nlp.py**: Execute natural language commands
-- **simple.py**: Zoom extents, undo, redo
-- **debug.py**: List entities, test selection methods
-- **export.py**: Export to Excel, CSV, and other formats
-
-**Pattern**: Each tool module contains a `register_*_tools(mcp)` function that:
-
-1. Defines all tools in that category
-2. Uses `@cad_tool` decorator for error handling
-3. Gets called once at server startup
-
-### 4. Abstract Interface (`core/cad_interface.py`)
-
-**CADInterface**: Abstract base class defining all operations:
-
-- Connection management: `connect()`, `disconnect()`, `is_connected()`
-- Drawing: `draw_line()`, `draw_circle()`, `draw_arc()`, `draw_rectangle()`, etc.
-- Layers: `create_layer()`, `list_layers()`, `delete_layer()`, etc.
-- Files: `save_drawing()`, `new_drawing()`, `close_drawing()`, etc.
-- Selection: `select_by_color()`, `select_by_layer()`, `select_by_type()`
-- Manipulation: `move_entities()`, `rotate_entities()`, `scale_entities()`, etc.
-
-All adapters must implement this interface.
-
-### 5. CAD Adapters (`adapters/`)
-
-**Factory Pattern Architecture** (v1.0.1+):
-
-```text
-adapters/
-├── __init__.py              # Factory: create_adapter(cad_type)
-└── autocad_adapter.py       # Universal adapter (1900+ lines)
-    └── Supports all CAD types via ProgID selection:
-        - AutoCAD (prog_id: "AutoCAD.Application")
-        - ZWCAD (prog_id: "ZWCAD.Application")
-        - GstarCAD (prog_id: "GCAD.Application")
-        - BricsCAD (prog_id: "BricscadApp.AcadApplication")
+```python
+class AutoCADAdapter(
+    UtilityMixin,       # Helpers, converters, property access
+    ConnectionMixin,    # COM connection lifecycle
+    DrawingMixin,       # draw_line, draw_circle, etc.
+    LayerMixin,         # Layer management
+    FileMixin,          # File operations
+    ViewMixin,          # Zoom, undo, redo
+    SelectionMixin,     # Entity selection
+    EntityMixin,        # Entity properties
+    ManipulationMixin,  # Move, rotate, scale, copy
+    BlockMixin,         # Block operations
+    ExportMixin,        # Excel export
+    CADInterface,       # Abstract base class
+):
+    pass  # All functionality via mixins
 ```
 
-**Why Single Adapter?**
+**Why Mixins?**
+- Each file <500 lines (maintainable)
+- Single responsibility per mixin
+- Easy code review and navigation
+- Reduced merge conflicts
+- Testable in isolation
 
-- All compatible CADs use the same COM API
-- No code duplication (DRY principle)
+**Why Single Universal Adapter?**
+- All compatible CADs use identical COM API
+- No code duplication (DRY)
 - Bug fixes apply to all CAD types
-- Easy to add new CAD types (just config)
+- Add new CAD = add config only
 
-**Key Features**:
+### 4. AdapterRegistry (`adapter_manager.py`)
 
-- COM threading safety: `pythoncom.CoInitialize/CoUninitialize`
-- Unified error handling with logging
-- Polling-based synchronization: `_wait_for()` replaces brittle `time.sleep()`
-- Helper methods: `_select_entities_generic()` for unified selection logic
-- Proper cleanup in `disconnect()`
-- Uses `win32com.client.GetActiveObject()` for active instances
-- Falls back to creating new instance if needed
-- Validates connection before each operation
+Singleton class that encapsulates adapter state:
 
-### 6. Configuration (`core/config.py`)
+```python
+class AdapterRegistry:
+    _instances: Dict[str, AutoCADAdapter]  # Cached adapters
+    _active_type: Optional[str]            # Current CAD
 
-**ConfigManager** (Singleton pattern):
+    def get_adapter(cad_type) -> AutoCADAdapter
+    def set_active(cad_type) -> None
+    def reset() -> None  # For testing
+```
 
-- Loads `config.json` with fallback defaults
-- Per-CAD settings: startup times, COM ProgID, command delays
-- NLP settings: strict mode, confidence thresholds
-- Output settings: default drawing directory
+**Benefits over global variables:**
+- Thread-safe state management
+- Testable (can reset between tests)
+- Explicit lifecycle control
 
-**Key Config Values**:
+### 5. Core (`core/`)
 
-- `startup_wait_time`: How long to wait for CAD to start (20s default)
-- `command_delay`: Pause between commands (0.5s default)
-- `strict_mode`: NLP parameter validation (false = use defaults)
+- **CADInterface**: Abstract base class defining 50+ methods
+- **ConfigManager**: Singleton with cascading config search
+- **Exceptions**: 8 domain-specific exception types
 
-### 7. NLP Processor (`nlp/processor.py`)
+---
 
-**ParsedCommand** (dataclass):
+## Data Flow
+
+```
+┌─────────────┐    MCP     ┌─────────────┐
+│ MCP Client  │ ─────────> │  server.py  │
+│ (Claude)    │  Protocol  │  (FastMCP)  │
+└─────────────┘            └──────┬──────┘
+                                  │
+                                  ▼
+                           ┌─────────────┐
+                           │ @cad_tool   │ ← Resolves adapter
+                           │  decorator  │ ← Error handling
+                           └──────┬──────┘
+                                  │
+                                  ▼
+                           ┌─────────────┐
+                           │ Adapter     │ ← get_adapter(cad_type)
+                           │ Registry    │
+                           └──────┬──────┘
+                                  │
+                                  ▼
+                           ┌─────────────┐
+                           │ AutoCAD     │ ← Mixin methods
+                           │ Adapter     │
+                           └──────┬──────┘
+                                  │
+                                  ▼
+                           ┌─────────────┐
+                           │ Windows COM │ ← pywin32/pythoncom
+                           │ Layer       │
+                           └──────┬──────┘
+                                  │
+                                  ▼
+                           ┌─────────────┐
+                           │ CAD App     │
+                           │ (AutoCAD)   │
+                           └─────────────┘
+```
+
+---
+
+## Design Patterns
+
+| Pattern | Location | Purpose |
+|---------|----------|---------|
+| **Mixin Composition** | AutoCADAdapter | Modular functionality |
+| **Singleton** | AdapterRegistry, ConfigManager | Shared state |
+| **Context Manager** | com_session, SelectionSetManager | Resource cleanup |
+| **Decorator** | @cad_tool, @com_safe | Cross-cutting concerns |
+| **Abstract Base** | CADInterface | Contract definition |
+| **Dataclass** | All configs | Type-safe configuration |
+
+---
+
+## Exception Hierarchy
+
+```
+MultiCADError
+├── CADConnectionError     (cad_type, reason)
+├── CADOperationError      (operation, reason)
+├── InvalidParameterError  (param, value, expected)
+│   ├── CoordinateError
+│   └── ColorError
+├── LayerError             (layer_name, reason)
+├── CADNotSupportedError   (cad_type, supported_cads)
+└── ConfigError            (config_file, reason)
+```
+
+**Benefits:**
+- Context-rich error messages
+- Granular error handling
+- Clear debugging info
+
+---
+
+## Architectural Strengths
+
+### 1. Clean Layer Separation
+
+```
+Core (abstractions) ← Adapters (implementation) ← Infrastructure ← Tools ← Server
+```
+
+- **0 circular dependencies**
+- Each layer only knows the one below
+- Easy to replace implementations
+
+### 2. 100% Type Safety
+
+- Type hints on all functions
+- Dataclasses for configuration
+- mypy-clean (no type errors)
+
+### 3. Robust Resource Management
+
+```python
+# Context managers ensure cleanup
+with com_session():
+    # COM initialized
+    with SelectionSetManager(doc, "TempSet") as ss:
+        # Selection set created
+        ss.SelectAll()
+    # Selection set deleted
+# COM uninitialized
+```
+
+### 4. Performance Optimizations
+
+| Optimization | Impact |
+|--------------|--------|
+| Connection pooling | Avoids 5-20s reconnections |
+| Batch operations | 60-70% fewer API calls |
+| PickfirstSelectionSet | Fast entity access |
+| Deferred refresh | `_skip_refresh=True` for batches |
+| LRU cache | `@lru_cache` on `get_adapter` |
+
+---
+
+## Configuration
+
+Cascading search order:
+1. Current directory
+2. `src/core/`
+3. `src/`
+4. Project root
+5. Hardcoded defaults
+
+Type-safe via dataclasses:
 
 ```python
 @dataclass
-class ParsedCommand:
-    operation: str          # "draw_line", "draw_circle", etc.
-    confidence: float       # 0.0-1.0
-    parameters: Dict[str, Any]
+class CADConfig:
+    type: str
+    prog_id: str
+    startup_wait_time: float
 ```
-
-**Parsing Flow**:
-
-1. Identify operation from keywords (shape type, action)
-2. Extract parameters (coordinates, colors, dimensions)
-3. Calculate confidence score
-4. Return ParsedCommand or raise NLPParseError
-
-**Supported Operations**:
-
-- `draw_line`: Extract start/end coordinates
-- `draw_circle`: Extract center, radius
-- `draw_rectangle`: Extract corners
-- `draw_polyline`: Extract point list
-- `draw_text`: Extract position, text, height
-
-## Data Flow Example
-
-**User Request**: "Draw a red line from 0,0 to 100,100"
-
-1. **Server.py** receives request → calls `execute_natural_command()`
-2. **@cad_tool decorator**:
-   - Calls `get_adapter()` to get/create AutoCAD adapter
-   - Sets `_current_adapter` global variable
-3. **NLP Tool** calls `nlp_processor.parse_command()`
-4. **NLP Processor**:
-   - Identifies `draw_line` operation
-   - Extracts coordinates and color
-   - Returns ParsedCommand with 95% confidence
-5. **NLP Tool** calls `adapter.draw_line()`
-6. **AutoCAD Adapter**:
-   - Validates connection
-   - Normalizes coordinates
-   - Calls COM to create line entity
-   - Applies properties (color, layer, lineweight)
-   - Returns entity handle
-7. **Server** returns result to client
-
-## Key Design Patterns
-
-1. **Abstract Base Class**: CADInterface defines contract
-2. **Adapter Pattern**: Implementations for different CADs
-3. **Factory Pattern**: `create_adapter()` in `adapters/__init__.py`
-4. **Decorator Pattern**: `@cad_tool` for error handling
-5. **Singleton Pattern**: ConfigManager
-6. **Strategy Pattern**: Different filter functions for entity selection
-7. **Template Method**: Consistent operation flow across adapters
-
-## Error Handling
-
-**Custom Exceptions**:
-
-- `CADConnectionError` - Connection failed
-- `CADOperationError` - Operation failed
-- `InvalidParameterError` - Bad parameter
-- `CoordinateError` - Invalid coordinate
-- `ColorError` - Invalid color
-- `LayerError` - Layer operation failed
-- `CADNotSupportedError` - Unknown CAD type
-- `NLPParseError` - NLP parsing failed
-- `ConfigError` - Config loading failed
-
-**Pattern**: Tools catch specific exceptions and re-raise as CADOperationError for consistency.
-
-## Performance Optimizations
-
-- **Adapter Caching**: `@lru_cache(maxsize=4)` on `get_adapter()`
-- **Connection Pooling**: Global `_cad_instances` dict prevents reconnections
-- **Regex Precompilation**: `_COORD_PATTERN` compiled once at module load
-- **Lazy Initialization**: Adapters created on first use, not at startup
-- **Polling over Sleep**: `_wait_for()` replaces brittle `time.sleep()`
-
-## Testing Strategy
-
-**Unit Tests**:
-
-- NLP parser tests (25+ cases)
-- Adapter interface tests (20+ cases)
-- No CAD required - all tests isolated
-
-**Integration Tests**:
-
-- Tool registration verification
-- End-to-end CAD operations
-
-**Test File**: `tests/test_*.py`
-
-## Next Steps
-
-- [03-EXTENDING.md](03-EXTENDING.md) - How to add new features
-- [04-TROUBLESHOOTING.md](04-TROUBLESHOOTING.md) - Debugging guide
-- [05-REFERENCE.md](05-REFERENCE.md) - Complete tool reference
