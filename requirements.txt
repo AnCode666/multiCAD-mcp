@@ -3,6 +3,9 @@
 # MCP Framework (FastMCP 2.0 - modern implementation)
 mcp>=1.2.0
 
+# MCP Apps UI Support
+mcp-ui-server>=1.0.0
+
 # Windows COM Interface
 pywin32>=300
 

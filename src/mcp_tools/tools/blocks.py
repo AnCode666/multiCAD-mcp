@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 from mcp.server.fastmcp import Context
 
 from core import InvalidParameterError
-from mcp_tools.decorators import cad_tool, get_current_adapter
+from mcp_tools.decorators import cad_tool, cad_tool_with_ui, get_current_adapter
 from mcp_tools.helpers import parse_coordinate
 
 logger = logging.getLogger(__name__)
@@ -280,14 +280,43 @@ def register_block_tools(mcp) -> None:
             logger.error(f"insert_blocks_batch failed: {e}")
             raise
 
-    @cad_tool(mcp, "list_blocks")
+    @cad_tool_with_ui(mcp, "list_blocks", ui_resource="block_browser")
     def list_blocks_tool(
         ctx: Context,
         cad_type: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """
+        List all block definitions in the current drawing.
+
+        Returns block data including:
+        - Name: Block name
+        - ObjectCount: Number of entities in block definition
+        - IsXRef: Whether block is an external reference
+        - ReferenceCount: Number of insertions in the drawing
+
+        In MCP Apps-compatible hosts (Claude Desktop, VS Code), this tool provides
+        an interactive block browser with search and statistics.
+
+        Args:
+            cad_type: CAD application to use (autocad, zwcad, gcad, bricscad)
+
+        Returns:
+            JSON result with block information and UI metadata
+        """
         adapter = get_current_adapter()
         try:
-            return list_blocks(adapter)
+            result = list_blocks(adapter)
+
+            # Add UI metadata if successful
+            if result.get("success") and result.get("blocks"):
+                result["_meta"] = {
+                    "ui": {
+                        "resourceUri": "ui://multicad/block_browser",
+                        "data": {"blocks": result["blocks"]},
+                    }
+                }
+
+            return result
         except InvalidParameterError:
             raise
         except Exception as e:

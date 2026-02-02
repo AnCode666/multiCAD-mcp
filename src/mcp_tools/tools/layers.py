@@ -15,7 +15,7 @@ from mcp.server.fastmcp import Context
 from pydantic import ValidationError
 
 from core.models import CreateLayerRequest
-from mcp_tools.decorators import cad_tool, get_current_adapter
+from mcp_tools.decorators import cad_tool, cad_tool_with_ui, get_current_adapter
 from mcp_tools.helpers import result_message
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,87 @@ def register_layer_tools(mcp):
         is_on = get_current_adapter().is_layer_on(name)
         status = "on (visible)" if is_on else "off (hidden)"
         return f"Layer '{name}' is {status}"
+
+    @cad_tool_with_ui(mcp, "get_layers_info", ui_resource="layer_panel")
+    def get_layers_info(
+        ctx: Context,
+        cad_type: Optional[str] = None,
+    ) -> str:
+        """
+        Get detailed information about all layers in the current drawing.
+
+        Returns comprehensive layer data including:
+        - Name: Layer name
+        - Color: Layer color (ACI index or name)
+        - On: Whether layer is visible
+        - Locked: Whether layer is locked
+        - Frozen: Whether layer is frozen
+        - Current: Whether this is the active layer
+
+        In MCP Apps-compatible hosts (Claude Desktop, VS Code), this tool provides
+        an interactive layer panel with visual color indicators and search.
+
+        Args:
+            cad_type: CAD application to use (autocad, zwcad, gcad, bricscad)
+
+        Returns:
+            JSON result with layer information and UI metadata
+        """
+        try:
+            adapter = get_current_adapter()
+
+            # Get layer names first
+            layer_names = adapter.list_layers()
+
+            # Build detailed layer info
+            layers = []
+            for name in layer_names:
+                try:
+                    layer_info = {
+                        "name": name,
+                        "on": adapter.is_layer_on(name),
+                    }
+                    # Try to get additional properties if available
+                    try:
+                        doc = adapter.get_document()
+                        layer = doc.Layers.Item(name)
+                        layer_info["color"] = layer.color
+                        layer_info["locked"] = layer.Lock
+                        layer_info["frozen"] = layer.Freeze
+                        # Check if current layer
+                        layer_info["current"] = doc.ActiveLayer.Name == name
+                    except Exception:
+                        # Fallback if detailed properties not available
+                        pass
+                    layers.append(layer_info)
+                except Exception as e:
+                    logger.debug(f"Error getting info for layer {name}: {e}")
+                    layers.append({"name": name, "on": True})
+
+            result = {
+                "success": True,
+                "count": len(layers),
+                "message": f"Found {len(layers)} layers",
+                "layers": layers,
+                "_meta": {
+                    "ui": {
+                        "resourceUri": "ui://multicad/layer_panel",
+                        "data": {"layers": layers},
+                    }
+                },
+            }
+
+            return json.dumps(result, indent=2)
+
+        except Exception as e:
+            logger.error(f"Get layers info failed: {e}")
+            result = {
+                "success": False,
+                "count": 0,
+                "message": f"Error getting layer info: {str(e)}",
+                "layers": [],
+            }
+            return json.dumps(result, indent=2)
 
     # ========== BATCH OPERATIONS (Multiple Layers) ==========
 

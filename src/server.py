@@ -26,6 +26,7 @@ from mcp_tools.tools import (
     register_debug_tools,
     register_block_tools,
 )
+from ui.resources import register_all_ui_resources
 
 # Setup at module load
 setup_utf8_encoding()
@@ -77,6 +78,10 @@ def register_all_tools():
 
     register_debug_tools(mcp)
     logger.debug("  ✓ Debug tools registered")
+
+    # Register MCP Apps UI resources
+    register_all_ui_resources(mcp)
+    logger.debug("  ✓ UI resources registered")
 
     logger.info("All MCP tools registered successfully")
 

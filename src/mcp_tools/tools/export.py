@@ -12,7 +12,7 @@ from typing import Optional
 
 from mcp.server.fastmcp import Context
 
-from mcp_tools.decorators import cad_tool, get_current_adapter
+from mcp_tools.decorators import cad_tool, cad_tool_with_ui, get_current_adapter
 from mcp_tools.helpers import result_message
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ def register_export_tools(mcp):
             logger.error(f"Export failed: {e}")
             return result_message("export drawing to excel", False, str(e))
 
-    @cad_tool(mcp, "extract_drawing_data")
+    @cad_tool_with_ui(mcp, "extract_drawing_data", ui_resource="drawing_viewer")
     def extract_drawing_data(
         ctx: Context,
         cad_type: Optional[str] = None,
@@ -116,22 +116,32 @@ def register_export_tools(mcp):
         - Area: Area (for closed objects)
         - Name: Name (for blocks, etc.)
 
+        In MCP Apps-compatible hosts (Claude Desktop, VS Code), this tool provides
+        an interactive UI with filtering, sorting, and statistics visualization.
+
         Args:
             cad_type: CAD application to use (autocad, zwcad, gcad, bricscad)
 
         Returns:
-            JSON result with extracted data
+            JSON result with extracted data and UI metadata
         """
         try:
             adapter = get_current_adapter()
             data = adapter.extract_drawing_data()
 
             if data:
+                # Build result with UI resource
                 result = {
                     "success": True,
                     "count": len(data),
                     "message": f"Extracted data from {len(data)} entities",
                     "entities": data,
+                    "_meta": {
+                        "ui": {
+                            "resourceUri": "ui://multicad/drawing_viewer",
+                            "data": {"entities": data},
+                        }
+                    },
                 }
             else:
                 result = {

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Data Viewer</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --text-primary: #cccccc;
+            --text-secondary: #9d9d9d;
+            --text-muted: #6d6d6d;
+            --accent: #0e639c;
+            --accent-hover: #1177bb;
+            --border: #3c3c3c;
+            --success: #4ec9b0;
+            --warning: #dcdcaa;
+            --info: #9cdcfe;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        /* Summary Cards */
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--info);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Data Table */
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+        }
+
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover {
+            background: var(--bg-primary);
+        }
+
+        th.sorted-asc::after {
+            content: ' \u25B2';
+            font-size: 10px;
+        }
+
+        th.sorted-desc::after {
+            content: ' \u25BC';
+            font-size: 10px;
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        td.handle {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: var(--success);
+        }
+
+        td.type {
+            color: var(--warning);
+        }
+
+        td.layer {
+            color: var(--info);
+        }
+
+        td.numeric {
+            text-align: right;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        /* Results count */
+        .results-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Drawing Data Viewer</h1>
+
+        <div class="summary" id="summary"></div>
+
+        <div class="filter-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search by handle, type, or layer...">
+            <select class="filter-select" id="typeFilter">
+                <option value="">All Types</option>
+            </select>
+            <select class="filter-select" id="layerFilter">
+                <option value="">All Layers</option>
+            </select>
+        </div>
+
+        <div class="results-count" id="resultsCount"></div>
+
+        <div class="table-container">
+            <table id="entitiesTable">
+                <thead>
+                    <tr>
+                        <th data-sort="Handle">Handle</th>
+                        <th data-sort="ObjectType">Type</th>
+                        <th data-sort="Layer">Layer</th>
+                        <th data-sort="Color">Color</th>
+                        <th data-sort="Length">Length</th>
+                        <th data-sort="Area">Area</th>
+                        <th data-sort="Name">Name</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Data injected from server
+        const rawData = /*DATA_PLACEHOLDER*/[];
+
+        // Extract entities array from response
+        const entityData = rawData.entities || rawData || [];
+
+        // State
+        let sortColumn = null;
+        let sortDirection = 'asc';
+        let filteredData = [...entityData];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSummary();
+            populateFilters();
+            renderTable();
+            setupEventListeners();
+        });
+
+        function renderSummary() {
+            const summary = document.getElementById('summary');
+            const totalEntities = entityData.length;
+
+            // Count by type
+            const typeCounts = {};
+            const layerSet = new Set();
+
+            entityData.forEach(e => {
+                const type = e.ObjectType || 'Unknown';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+                if (e.Layer) layerSet.add(e.Layer);
+            });
+
+            const topType = Object.entries(typeCounts)
+                .sort((a, b) => b[1] - a[1])[0];
+
+            summary.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalEntities}</div>
+                    <div class="stat-label">Total Entities</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${Object.keys(typeCounts).length}</div>
+                    <div class="stat-label">Entity Types</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${layerSet.size}</div>
+                    <div class="stat-label">Layers Used</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${topType ? topType[0] : '-'}</div>
+                    <div class="stat-label">Most Common (${topType ? topType[1] : 0})</div>
+                </div>
+            `;
+        }
+
+        function populateFilters() {
+            const types = [...new Set(entityData.map(e => e.ObjectType).filter(Boolean))].sort();
+            const layers = [...new Set(entityData.map(e => e.Layer).filter(Boolean))].sort();
+
+            const typeFilter = document.getElementById('typeFilter');
+            types.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                typeFilter.appendChild(option);
+            });
+
+            const layerFilter = document.getElementById('layerFilter');
+            layers.forEach(layer => {
+                const option = document.createElement('option');
+                option.value = layer;
+                option.textContent = layer;
+                layerFilter.appendChild(option);
+            });
+        }
+
+        function filterData() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const typeFilter = document.getElementById('typeFilter').value;
+            const layerFilter = document.getElementById('layerFilter').value;
+
+            filteredData = entityData.filter(e => {
+                const matchSearch = !search ||
+                    (e.Handle && e.Handle.toLowerCase().includes(search)) ||
+                    (e.ObjectType && e.ObjectType.toLowerCase().includes(search)) ||
+                    (e.Layer && e.Layer.toLowerCase().includes(search)) ||
+                    (e.Name && e.Name.toLowerCase().includes(search));
+
+                const matchType = !typeFilter || e.ObjectType === typeFilter;
+                const matchLayer = !layerFilter || e.Layer === layerFilter;
+
+                return matchSearch && matchType && matchLayer;
+            });
+
+            if (sortColumn) {
+                sortData(sortColumn, false);
+            }
+
+            renderTable();
+        }
+
+        function sortData(column, toggleDirection = true) {
+            if (toggleDirection) {
+                if (sortColumn === column) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortColumn = column;
+                    sortDirection = 'asc';
+                }
+            }
+
+            filteredData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+
+                // Handle null/undefined
+                if (aVal == null) aVal = '';
+                if (bVal == null) bVal = '';
+
+                // Numeric comparison for Length and Area
+                if (column === 'Length' || column === 'Area' || column === 'Color') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                }
+
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update header styles
+            document.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === column) {
+                    th.classList.add(sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                }
+            });
+        }
+
+        function formatNumber(value) {
+            if (value == null || value === '') return '-';
+            const num = parseFloat(value);
+            if (isNaN(num)) return value;
+            return num.toLocaleString(undefined, { maximumFractionDigits: 3 });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const resultsCount = document.getElementById('resultsCount');
+
+            resultsCount.textContent = `Showing ${filteredData.length} of ${entityData.length} entities`;
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">&#x1F50D;</div>
+                                <div>No entities found matching your criteria</div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(entity => `
+                <tr>
+                    <td class="handle">${entity.Handle || '-'}</td>
+                    <td class="type">${entity.ObjectType || '-'}</td>
+                    <td class="layer">${entity.Layer || '-'}</td>
+                    <td>${entity.Color != null ? entity.Color : '-'}</td>
+                    <td class="numeric">${formatNumber(entity.Length)}</td>
+                    <td class="numeric">${formatNumber(entity.Area)}</td>
+                    <td>${entity.Name || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', filterData);
+            document.getElementById('typeFilter').addEventListener('change', filterData);
+            document.getElementById('layerFilter').addEventListener('change', filterData);
+
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    sortData(th.dataset.sort);
+                    renderTable();
+                });
+            });
+        }
+    </script>
+</body>
+</html>

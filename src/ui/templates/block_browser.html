@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Browser</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d30;
+            --text-primary: #cccccc;
+            --text-secondary: #9d9d9d;
+            --text-muted: #6d6d6d;
+            --accent: #0e639c;
+            --border: #3c3c3c;
+            --success: #4ec9b0;
+            --warning: #dcdcaa;
+            --info: #9cdcfe;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .summary {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px 16px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--info);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .search-bar {
+            margin-bottom: 12px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .results-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .block-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .block-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .block-card:hover {
+            border-color: var(--accent);
+        }
+
+        .block-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .block-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .block-name {
+            flex: 1;
+            font-weight: 500;
+            color: var(--warning);
+            word-break: break-word;
+        }
+
+        .block-details {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 12px;
+            font-size: 12px;
+        }
+
+        .detail-label {
+            color: var(--text-muted);
+        }
+
+        .detail-value {
+            color: var(--text-primary);
+        }
+
+        .detail-value.count {
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .badge-xref {
+            background: var(--info);
+            color: var(--bg-primary);
+        }
+
+        .badge-dynamic {
+            background: var(--success);
+            color: var(--bg-primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Block Browser</h1>
+
+        <div class="summary" id="summary"></div>
+
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search blocks...">
+        </div>
+
+        <div class="results-count" id="resultsCount"></div>
+
+        <div class="block-grid" id="blockGrid"></div>
+    </div>
+
+    <script>
+        // Data injected from server
+        const rawData = /*DATA_PLACEHOLDER*/[];
+
+        // Extract blocks array
+        const blockData = rawData.blocks || rawData || [];
+
+        let filteredBlocks = [...blockData];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSummary();
+            renderBlocks();
+            setupEventListeners();
+        });
+
+        function renderSummary() {
+            const summary = document.getElementById('summary');
+            const total = blockData.length;
+            const totalRefs = blockData.reduce((sum, b) => sum + (b.referenceCount || b.references || 0), 0);
+            const xrefs = blockData.filter(b => b.isXRef || b.IsXRef).length;
+
+            summary.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${total}</div>
+                    <div class="stat-label">Block Definitions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalRefs}</div>
+                    <div class="stat-label">Total References</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${xrefs}</div>
+                    <div class="stat-label">External References</div>
+                </div>
+            `;
+        }
+
+        function filterBlocks() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            filteredBlocks = blockData.filter(block => {
+                const name = (block.name || block.Name || '').toLowerCase();
+                return name.includes(search);
+            });
+            renderBlocks();
+        }
+
+        function renderBlocks() {
+            const grid = document.getElementById('blockGrid');
+            const resultsCount = document.getElementById('resultsCount');
+
+            resultsCount.textContent = `Showing ${filteredBlocks.length} of ${blockData.length} blocks`;
+
+            if (filteredBlocks.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-state-icon">\u{1F4E6}</div>
+                        <div>No blocks found</div>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filteredBlocks.map(block => {
+                const name = block.name || block.Name || 'Unknown';
+                const refCount = block.referenceCount || block.references || block.RefCount || 0;
+                const objectCount = block.objectCount || block.ObjectCount || block.entities || '-';
+                const isXRef = block.isXRef || block.IsXRef;
+                const isDynamic = block.isDynamic || block.IsDynamic;
+                const comments = block.comments || block.Comments || '';
+
+                let badges = '';
+                if (isXRef) badges += '<span class="badge badge-xref">XRef</span>';
+                if (isDynamic) badges += '<span class="badge badge-dynamic">Dynamic</span>';
+
+                return `
+                    <div class="block-card">
+                        <div class="block-header">
+                            <div class="block-icon">\u{1F4E6}</div>
+                            <div class="block-name">${name}${badges}</div>
+                        </div>
+                        <div class="block-details">
+                            <span class="detail-label">References:</span>
+                            <span class="detail-value count">${refCount}</span>
+                            <span class="detail-label">Objects:</span>
+                            <span class="detail-value">${objectCount}</span>
+                            ${comments ? `
+                                <span class="detail-label">Notes:</span>
+                                <span class="detail-value">${comments}</span>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', filterBlocks);
+        }
+    </script>
+</body>
+</html>
