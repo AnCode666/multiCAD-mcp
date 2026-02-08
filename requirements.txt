@@ -1,10 +1,13 @@
 # multiCAD-MCP Dependencies
 
-# MCP Framework (FastMCP 2.0 - modern implementation)
-mcp>=1.2.0
+# MCP Framework (FastMCP standalone - allows web dashboard integration)
+fastmcp>=2.14.0
+mcp>=1.24.0
 
-# MCP Apps UI Support
-mcp-ui-server>=1.0.0
+# Web Dashboard (FastAPI based)
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydantic-settings>=2.0.0
 
 # Windows COM Interface
 pywin32>=300

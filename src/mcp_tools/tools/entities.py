@@ -1,16 +1,23 @@
 """
-Entity selection and manipulation tools.
+Unified entity management tool.
 
-Provides tools for:
-- Selecting entities by color, layer, or type
-- Moving, rotating, and scaling entities
-- Copying and pasting entities
-- Changing entity properties with batch operations (color, layer)
+Single manage_entities tool replaces 13 legacy entity tools with
+a simple shorthand format for ~85% token reduction.
+
+SHORTHAND FORMAT (one per line):
+    select|by|value               → select|layer|walls
+    move|handles|offset_x|offset_y → move|A1,B2|10|5
+    rotate|handles|angle|cx|cy    → rotate|A1|45|0|0
+    scale|handles|factor|cx|cy    → scale|A1|2.0|0|0
+    set_color|handles|color       → set_color|A1,B2|red
+    set_layer|handles|layer       → set_layer|A1|walls
+    copy|handles                  → copy|A1,B2
+    delete|handles                → delete|A1,B2
 """
 
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, Callable, List, Tuple
 
 from mcp.server.fastmcp import Context
 from pydantic import ValidationError
@@ -22,526 +29,337 @@ from core.models import (
 )
 from mcp_tools.decorators import cad_tool, get_current_adapter
 from mcp_tools.helpers import parse_handles
+from mcp_tools.shorthand import parse_entity_ops_input
 
 logger = logging.getLogger(__name__)
 
 
+# ========== Action Handlers ==========
+
+
+def _select(spec: Dict[str, Any]) -> Dict[str, Any]:
+    adapter = get_current_adapter()
+    by = spec["by"].lower()
+
+    select_map = {
+        "color": ("color", lambda v: adapter.select_by_color(v)),
+        "layer": ("layer_name", lambda v: adapter.select_by_layer(v)),
+        "type": ("entity_type", lambda v: adapter.select_by_type(v)),
+    }
+
+    entry = select_map.get(by)
+    if not entry:
+        return {
+            "success": False,
+            "error": f"Unknown selection criteria '{by}'. Supported: color, layer, type",
+        }
+
+    _, handler = entry
+    value = spec["value"]
+    handles = handler(value)
+
+    if handles:
+        return {
+            "success": True,
+            "count": len(handles),
+            "handles": handles,
+            "detail": f"Selected {len(handles)} entities by {by}='{value}'",
+        }
+    return {
+        "success": True,
+        "count": 0,
+        "handles": [],
+        "detail": f"No entities found with {by}='{value}'",
+    }
+
+
+def _move(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    validated = MoveEntityRequest(
+        handles=handle_list,
+        displacement=(spec["offset_x"], spec["offset_y"]),
+    )
+    success = get_current_adapter().move_entities(
+        validated.handles, spec["offset_x"], spec["offset_y"]
+    )
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": f"Moved by ({spec['offset_x']}, {spec['offset_y']})",
+    }
+
+
+def _rotate(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    validated = RotateEntityRequest(
+        handles=handle_list,
+        base_point=(spec["center_x"], spec["center_y"]),
+        angle=spec["angle"],
+    )
+    success = get_current_adapter().rotate_entities(
+        validated.handles, spec["center_x"], spec["center_y"], validated.angle
+    )
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": f"Rotated {spec['angle']}° around ({spec['center_x']}, {spec['center_y']})",
+    }
+
+
+def _scale(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    validated = ScaleEntityRequest(
+        handles=handle_list,
+        base_point=(spec["center_x"], spec["center_y"]),
+        scale_factor=spec["scale_factor"],
+    )
+    success = get_current_adapter().scale_entities(
+        validated.handles,
+        spec["center_x"],
+        spec["center_y"],
+        validated.scale_factor,
+    )
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": f"Scaled {spec['scale_factor']}x around ({spec['center_x']}, {spec['center_y']})",
+    }
+
+
+def _set_color(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    color = spec["color"]
+    success = get_current_adapter().change_entity_color(handle_list, color)
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": f"Color set to '{color}'",
+    }
+
+
+def _set_layer(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    layer_name = spec["layer_name"]
+    success = get_current_adapter().change_entity_layer(handle_list, layer_name)
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": f"Moved to layer '{layer_name}'",
+    }
+
+
+def _set_color_bylayer(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handles_raw = spec["handles"]
+    if isinstance(handles_raw, str):
+        if handles_raw.startswith("["):
+            handles_list = json.loads(handles_raw)
+        else:
+            handles_list = parse_handles(handles_raw)
+    else:
+        handles_list = handles_raw
+
+    result = get_current_adapter().set_entities_color_bylayer(handles_list)
+    return {
+        "success": result.get("changed", 0) > 0,
+        "count": result.get("total", len(handles_list)),
+        "detail": f"Set {result.get('changed', 0)} entities to ByLayer color",
+    }
+
+
+def _copy(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    success = get_current_adapter().copy_entities(handle_list)
+    return {
+        "success": success,
+        "count": len(handle_list),
+        "detail": (
+            f"Copied {len(handle_list)} entities to clipboard"
+            if success
+            else "Failed to copy entities"
+        ),
+    }
+
+
+def _paste(spec: Dict[str, Any]) -> Dict[str, Any]:
+    base_point = spec["base_point"]
+    parts = str(base_point).split(",")
+    if len(parts) < 2:
+        return {"success": False, "error": "base_point must be 'x,y' format"}
+    bx, by = float(parts[0].strip()), float(parts[1].strip())
+    get_current_adapter().paste_entities(bx, by)
+def _delete(spec: Dict[str, Any]) -> Dict[str, Any]:
+    handle_list = parse_handles(spec["handles"])
+    adapter = get_current_adapter()
+    deleted_count = 0
+    for handle in handle_list:
+        if adapter.delete_entity(handle):
+            deleted_count += 1
+    return {
+        "success": deleted_count > 0,
+        "count": len(handle_list),
+        "detail": f"Deleted {deleted_count} entities",
+    }
+
+
+# Dispatch table: action -> (handler, required_fields)
+ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
+    "select": (_select, ["by", "value"]),
+    "move": (_move, ["handles", "offset_x", "offset_y"]),
+    "rotate": (_rotate, ["handles", "center_x", "center_y", "angle"]),
+    "scale": (_scale, ["handles", "center_x", "center_y", "scale_factor"]),
+    "set_color": (_set_color, ["handles", "color"]),
+    "set_layer": (_set_layer, ["handles", "layer_name"]),
+    "set_color_bylayer": (_set_color_bylayer, ["handles"]),
+    "copy": (_copy, ["handles"]),
+    "paste": (_paste, ["base_point"]),
+    "delete": (_delete, ["handles"]),
+}
+
+
+def _validate_required_fields(
+    spec: Dict[str, Any], required: List[str], action: str
+) -> Optional[str]:
+    missing = [f for f in required if f not in spec]
+    if missing:
+        return f"'{action}' requires fields: {', '.join(missing)}"
+    return None
+
+
+# ========== Tool Registration ==========
+
+
 def register_entity_tools(mcp):
-    """Register entity selection and manipulation tools with FastMCP.
+    """Register unified entity management tool with FastMCP."""
 
-    Args:
-        mcp: FastMCP instance
-    """
-
-    @cad_tool(mcp, "select_by_color")
-    def select_by_color(
+    @cad_tool(mcp, "manage_entities")
+    def manage_entities(
         ctx: Context,
-        color: str,
+        operations: str,
         cad_type: Optional[str] = None,
     ) -> str:
         """
-        Select all entities of a specific color.
+        Manage entities: select, transform, restyle, copy/paste.
 
         Args:
-            color: Color name (red, blue, green, white, etc.)
+            operations: Operations in SHORTHAND format (one per line):
+
+                select|by|value               → select|layer|walls
+                move|handles|offset_x|offset_y → move|A1,B2|10|5
+                rotate|handles|angle|cx|cy    → rotate|A1|45|0|0
+                scale|handles|factor|cx|cy    → scale|A1|2.0|0|0
+                set_color|handles|color       → set_color|A1,B2|red
+                set_layer|handles|layer       → set_layer|A1|walls
+                set_color_bylayer|handles     → set_color_bylayer|A1,B2
+                copy|handles                  → copy|A1,B2
+                paste|base_point              → paste|100,200
+                delete|handles                → delete|A1,B2
+
+                "handles" = comma-separated entity handles (e.g. "A1B2,C3D4")
+                "by" = "color", "layer", or "type"
+
+                Example:
+                    select|layer|walls
+                    move|A1B2,C3D4|10|5
+                    set_color|A1B2,C3D4|red
+
+                JSON format also supported for backwards compatibility.
+
             cad_type: CAD application to use
 
         Returns:
-            Number of selected entities and their handles
-        """
-        handles = get_current_adapter().select_by_color(color)
-
-        if handles:
-            handles_str = ",".join(handles)
-            return f"Selected {len(handles)} entities with color '{color}'. Handles: {handles_str}"
-        else:
-            return f"No entities found with color '{color}'"
-
-    @cad_tool(mcp, "select_by_layer")
-    def select_by_layer(
-        ctx: Context,
-        layer_name: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Select all entities on a specific layer.
-
-        Args:
-            layer_name: Name of the layer
-            cad_type: CAD application to use
-
-        Returns:
-            Number of selected entities and their handles
-        """
-        handles = get_current_adapter().select_by_layer(layer_name)
-
-        if handles:
-            handles_str = ",".join(handles)
-            return f"Selected {len(handles)} entities on layer '{layer_name}'. Handles: {handles_str}"
-        else:
-            return f"No entities found on layer '{layer_name}'"
-
-    @cad_tool(mcp, "select_by_type")
-    def select_by_type(
-        ctx: Context,
-        entity_type: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Select all entities of a specific type.
-
-        Args:
-            entity_type: Entity type (line, circle, arc, polyline, etc.)
-            cad_type: CAD application to use
-
-        Returns:
-            Number of selected entities and their handles
-        """
-        handles = get_current_adapter().select_by_type(entity_type)
-
-        if handles:
-            handles_str = ",".join(handles)
-            return f"Selected {len(handles)} entities of type '{entity_type}'. Handles: {handles_str}"
-        else:
-            return f"No entities found of type '{entity_type}'"
-
-    @cad_tool(mcp, "move_entities")
-    def move_entities(
-        ctx: Context,
-        handles: str,
-        offset_x: float,
-        offset_y: float,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Move entities by an offset.
-
-        Args:
-            handles: Comma-separated entity handles
-            offset_x: X offset distance
-            offset_y: Y offset distance
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of moved entities
+            JSON result with per-operation status
         """
         try:
-            handle_list = parse_handles(handles)
-
-            # Use Pydantic validation
-            validated = MoveEntityRequest(
-                handles=handle_list, displacement=(offset_x, offset_y)
-            )
-
-            success = get_current_adapter().move_entities(
-                validated.handles, offset_x, offset_y
-            )
-
-            if success:
-                return f"Moved {len(handle_list)} entities by ({offset_x}, {offset_y})"
-            else:
-                return "Failed to move entities"
-        except ValidationError as e:
-            error_msg = f"Validation error: {e.errors()[0]['msg']}"
-            logger.error(f"Validation error moving entities: {error_msg}")
-            return f"Failed to move entities: {error_msg}"
-
-    @cad_tool(mcp, "rotate_entities")
-    def rotate_entities(
-        ctx: Context,
-        handles: str,
-        center_x: float,
-        center_y: float,
-        angle: float,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Rotate entities around a point.
-
-        Args:
-            handles: Comma-separated entity handles
-            center_x: X coordinate of rotation center
-            center_y: Y coordinate of rotation center
-            angle: Rotation angle in degrees
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of rotated entities
-        """
-        try:
-            handle_list = parse_handles(handles)
-
-            # Use Pydantic validation
-            validated = RotateEntityRequest(
-                handles=handle_list, base_point=(center_x, center_y), angle=angle
-            )
-
-            success = get_current_adapter().rotate_entities(
-                validated.handles, center_x, center_y, validated.angle
-            )
-
-            if success:
-                return f"Rotated {len(handle_list)} entities by {angle}°"
-            else:
-                return "Failed to rotate entities"
-        except ValidationError as e:
-            error_msg = f"Validation error: {e.errors()[0]['msg']}"
-            logger.error(f"Validation error rotating entities: {error_msg}")
-            return f"Failed to rotate entities: {error_msg}"
-
-    @cad_tool(mcp, "scale_entities")
-    def scale_entities(
-        ctx: Context,
-        handles: str,
-        center_x: float,
-        center_y: float,
-        scale_factor: float,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Scale entities around a point.
-
-        Args:
-            handles: Comma-separated entity handles
-            center_x: X coordinate of scale center
-            center_y: Y coordinate of scale center
-            scale_factor: Scale factor (1.0 = no change, 2.0 = double size)
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of scaled entities
-        """
-        try:
-            handle_list = parse_handles(handles)
-
-            # Use Pydantic validation (automatically checks scale_factor > 0)
-            validated = ScaleEntityRequest(
-                handles=handle_list,
-                base_point=(center_x, center_y),
-                scale_factor=scale_factor,
-            )
-
-            success = get_current_adapter().scale_entities(
-                validated.handles, center_x, center_y, validated.scale_factor
-            )
-
-            if success:
-                return f"Scaled {len(handle_list)} entities by {scale_factor}x"
-            else:
-                return "Failed to scale entities"
-        except ValidationError as e:
-            error_msg = f"Validation error: {e.errors()[0]['msg']}"
-            logger.error(f"Validation error scaling entities: {error_msg}")
-            return f"Failed to scale entities: {error_msg}"
-
-    @cad_tool(mcp, "copy_entities")
-    def copy_entities(
-        ctx: Context,
-        handles: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Copy entities to clipboard.
-
-        Args:
-            handles: Comma-separated entity handles
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of copied entities
-        """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().copy_entities(handle_list)
-
-        if success:
-            return f"Copied {len(handle_list)} entities to clipboard"
-        else:
-            return "Failed to copy entities"
-
-    @cad_tool(mcp, "paste_entities")
-    def paste_entities(
-        ctx: Context,
-        base_point_x: float,
-        base_point_y: float,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Paste entities from clipboard at a base point.
-
-        Args:
-            base_point_x: X coordinate of base point
-            base_point_y: Y coordinate of base point
-            cad_type: CAD application to use
-
-        Returns:
-            Status message
-        """
-        get_current_adapter().paste_entities(base_point_x, base_point_y)
-        return f"Pasted entities at ({base_point_x}, {base_point_y})"
-
-    @cad_tool(mcp, "change_entity_color")
-    def change_entity_color(
-        ctx: Context,
-        handles: str,
-        color: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Change color of entities (all to same color).
-
-        Args:
-            handles: Comma-separated entity handles
-            color: New color name
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of changed entities
-        """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().change_entity_color(handle_list, color)
-
-        if success:
-            return f"Changed color of {len(handle_list)} entities to '{color}'"
-        else:
-            return "Failed to change entity color"
-
-    @cad_tool(mcp, "change_entities_colors")
-    def change_entities_colors(
-        ctx: Context,
-        color_changes: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Change color of multiple entities with individual colors.
-
-        Args:
-            color_changes: JSON array of color change specifications.
-                          Example: [{"handles": "h1,h2,h3", "color": "red"}, {"handles": "h4,h5", "color": "blue"}]
-                          Fields: handles (required, comma-separated), color (required)
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with operation status
-        """
-        try:
-            changes_data = (
-                json.loads(color_changes)
-                if isinstance(color_changes, str)
-                else color_changes
-            )
-            if not isinstance(changes_data, list):
-                changes_data = [changes_data]
-
-            results = []
-            total_changed = 0
-
-            for i, change_spec in enumerate(changes_data):
-                try:
-                    handles_str = change_spec["handles"]
-                    color = change_spec["color"]
-                    handle_list = parse_handles(handles_str)
-
-                    success = get_current_adapter().change_entity_color(
-                        handle_list, color
-                    )
-                    changed = len(handle_list) if success else 0
-                    total_changed += changed
-
-                    results.append(
-                        {
-                            "index": i,
-                            "handles": handles_str,
-                            "color": color,
-                            "count": len(handle_list),
-                            "success": success,
-                        }
-                    )
-                except Exception as e:
-                    logger.error(f"Error changing color in operation {i}: {e}")
-                    results.append({"index": i, "success": False, "error": str(e)})
-
-            return json.dumps(
-                {
-                    "total_changes": len(changes_data),
-                    "total_changed": total_changed,
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total_changes": 0,
-                    "total_changed": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
-
-    @cad_tool(mcp, "change_entity_layer")
-    def change_entity_layer(
-        ctx: Context,
-        handles: str,
-        layer_name: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Move entities to a different layer (all to same layer).
-
-        Args:
-            handles: Comma-separated entity handles
-            layer_name: Target layer name
-            cad_type: CAD application to use
-
-        Returns:
-            Status message with count of moved entities
-        """
-        handle_list = parse_handles(handles)
-        success = get_current_adapter().change_entity_layer(handle_list, layer_name)
-
-        if success:
-            return f"Moved {len(handle_list)} entities to layer '{layer_name}'"
-        else:
-            return "Failed to change entity layer"
-
-    @cad_tool(mcp, "change_entities_layers")
-    def change_entities_layers(
-        ctx: Context,
-        layer_changes: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Move multiple entities to different layers with individual assignments.
-
-        Args:
-            layer_changes: JSON array of layer change specifications.
-                          Example: [{"handles": "h1,h2,h3", "layer_name": "Layer1"}, {"handles": "h4,h5", "layer_name": "Layer2"}]
-                          Fields: handles (required, comma-separated), layer_name (required)
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with operation status
-        """
-        try:
-            changes_data = (
-                json.loads(layer_changes)
-                if isinstance(layer_changes, str)
-                else layer_changes
-            )
-            if not isinstance(changes_data, list):
-                changes_data = [changes_data]
-
-            results = []
-            total_moved = 0
-
-            for i, change_spec in enumerate(changes_data):
-                try:
-                    handles_str = change_spec["handles"]
-                    layer_name = change_spec["layer_name"]
-                    handle_list = parse_handles(handles_str)
-
-                    success = get_current_adapter().change_entity_layer(
-                        handle_list, layer_name
-                    )
-                    moved = len(handle_list) if success else 0
-                    total_moved += moved
-
-                    results.append(
-                        {
-                            "index": i,
-                            "handles": handles_str,
-                            "layer_name": layer_name,
-                            "count": len(handle_list),
-                            "success": success,
-                        }
-                    )
-                except Exception as e:
-                    logger.error(f"Error changing layer in operation {i}: {e}")
-                    results.append({"index": i, "success": False, "error": str(e)})
-
-            return json.dumps(
-                {
-                    "total_changes": len(changes_data),
-                    "total_moved": total_moved,
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total_changes": 0,
-                    "total_moved": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
-
-    @cad_tool(mcp, "set_entities_color_bylayer")
-    def set_entities_color_bylayer(
-        ctx: Context,
-        handles: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Set entities to use their layer's color (ByLayer).
-
-        Args:
-            handles: JSON array of entity handles, or single handle string
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with counts and per-entity details
-
-        Example:
-            handles='["A1B2C3", "D4E5F6"]'  # Multiple entities
-            handles='A1B2C3'                 # Single entity
-
-        Note:
-            - Entities will inherit their layer's color
-            - Color value 256 (acByLayer) is assigned
-            - Uses modern TrueColor property
-        """
-        adapter = get_current_adapter()
-
-        try:
-            # Parse handles input
-            if handles.startswith("["):
-                # JSON array
-                handles_list = json.loads(handles)
-            else:
-                # Single handle
-                handles_list = [handles]
-
-            result = adapter.set_entities_color_bylayer(handles_list)
-
-            return json.dumps(result, indent=2)
-
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total": 0,
-                    "changed": 0,
-                    "failed": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
+            ops_data = parse_entity_ops_input(operations)
         except Exception as e:
             return json.dumps(
                 {
                     "success": False,
-                    "error": str(e),
+                    "error": f"Invalid input: {str(e)}",
                     "total": 0,
-                    "changed": 0,
-                    "failed": 0,
+                    "succeeded": 0,
                     "results": [],
                 },
                 indent=2,
             )
+
+        results = []
+
+        for i, spec in enumerate(ops_data):
+            action = spec.get("action")
+
+            if not action:
+                results.append(
+                    {
+                        "index": i,
+                        "success": False,
+                        "error": "Missing 'action' field. Supported: "
+                        + ", ".join(ENTITY_DISPATCH.keys()),
+                    }
+                )
+                continue
+
+            action_lower = action.lower()
+            dispatch_entry = ENTITY_DISPATCH.get(action_lower)
+
+            if not dispatch_entry:
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": f"Unknown action '{action}'. Supported: "
+                        + ", ".join(ENTITY_DISPATCH.keys()),
+                    }
+                )
+                continue
+
+            handler, required_fields = dispatch_entry
+
+            field_error = _validate_required_fields(spec, required_fields, action_lower)
+            if field_error:
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": field_error,
+                    }
+                )
+                continue
+
+            try:
+                result = handler(spec)
+                results.append({"index": i, "action": action_lower, **result})
+            except ValidationError as e:
+                error_msg = f"Validation error: {e.errors()[0]['msg']}"
+                logger.error(
+                    f"Validation error in entity op {i} ({action_lower}): {error_msg}"
+                )
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": error_msg,
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error in entity op {i} ({action_lower}): {e}")
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
+
+        return json.dumps(
+            {
+                "total": len(ops_data),
+                "succeeded": sum(1 for r in results if r.get("success")),
+                "results": results,
+            },
+            indent=2,
+        )

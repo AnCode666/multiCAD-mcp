@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>multiCAD-MCP Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">📐</span>
+                <h1>multiCAD-MCP <span class="version">v0.1.3</span></h1>
+            </div>
+            <div class="connection-status" id="connection-status">
+                <span class="status-indicator yellow"></span>
+                <span class="status-text">Detectando...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-tab="overview">
+                    <span class="icon">📊</span> Resumen
+                </button>
+                <button class="nav-btn" data-tab="layers">
+                    <span class="icon">🥞</span> Capas
+                </button>
+                <button class="nav-btn" data-tab="blocks">
+                    <span class="icon">📦</span> Bloques
+                </button>
+                <button class="nav-btn" data-tab="logs">
+                    <span class="icon">📝</span> Logs
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="cad-info" id="cad-info">
+                    <p class="label">CAD Detectado</p>
+                    <p class="value" id="cad-type-display">Ninguno</p>
+                </div>
+            </div>
+        </aside>
+
+        <section class="content-area">
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="welcome-header">
+                    <h2>Panel de Control</h2>
+                    <p>Estado global de la conexión CAD y herramientas activas.</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon purple">📁</div>
+                        <div class="stat-details">
+                            <p class="stat-label">Dibujos Abiertos</p>
+                            <p class="stat-value" id="drawings-count">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">🥞</div>
+                        <div class="stat-details">
+                            <p class="stat-label">Capas Totales</p>
+                            <p class="stat-value" id="total-layers-count">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📦</div>
+                        <div class="stat-details">
+                            <p class="stat-label">Bloques Definidos</p>
+                            <p class="stat-value" id="total-blocks-count">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="drawing-info-card card">
+                    <div class="card-header">
+                        <h3>Dibujo Activo</h3>
+                        <button class="btn-refresh" id="refresh-all">🔄 Refrescar</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="drawing-main-info">
+                            <span class="drawing-icon">📄</span>
+                            <div class="drawing-text">
+                                <p class="drawing-name" id="current-drawing-name">Esperando conexión...</p>
+                                <p class="drawing-path" id="current-drawing-path">Inicia una sesión para ver detalles</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layers Tab -->
+            <div id="tab-layers" class="tab-content">
+                <div class="section-header">
+                    <h2>Gestión de Capas</h2>
+                    <div class="header-actions">
+                        <input type="text" placeholder="Filtrar capas..." class="search-input" id="filter-layers">
+                    </div>
+                </div>
+                <div class="card table-container">
+                    <table id="layers-table">
+                        <thead>
+                            <tr>
+                                <th>Capa</th>
+                                <th>Color</th>
+                                <th>Estado</th>
+                                <th>Entidades</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="4" class="empty-state">No hay datos de capas disponibles</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Blocks Tab -->
+            <div id="tab-blocks" class="tab-content">
+                <div class="section-header">
+                    <h2>Explorador de Bloques</h2>
+                    <div class="header-actions">
+                        <input type="text" placeholder="Buscar bloques..." class="search-input" id="filter-blocks">
+                    </div>
+                </div>
+                <div class="blocks-grid" id="blocks-container">
+                    <!-- Blocks cards will be injected here -->
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="tab-logs" class="tab-content">
+                <div class="section-header">
+                    <h2>Consola del Servidor</h2>
+                </div>
+                <div class="console-box card" id="console-output">
+                    <div class="log-entry system">Iniciando interfaz web...</div>
+                    <div class="log-entry info">multiCAD-MCP Dashboard cargado.</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="message-box" class="message-box"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

@@ -419,3 +419,248 @@ class DrawingMixin:
             f"Drew spline with {len(points)} points (degree={degree}, closed={closed})"
         )
         return str(spline.Handle)
+
+    def draw_leader(
+        self,
+        points: List[Coordinate],
+        text: Optional[str] = None,
+        text_height: float = 2.5,
+        layer: str = "0",
+        color: str | int = "white",
+        leader_type: str = "line_with_arrow",
+        _skip_refresh: bool = False,
+    ) -> str:
+        """Draw a leader (dimension leader line) with optional text annotation.
+
+        NOTE: Internally uses MLeader for proper text rendering.
+        A single leader line is created as a multi-leader with one arrow.
+
+        Args:
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
+        if len(points) < 2:
+            raise InvalidParameterError("points", points, "at least 2 points")
+
+        # Map leader type names to arrow styles for MLeader
+        # Note: MLeader uses arrow head symbols instead of type constants
+        leader_type_to_arrow = {
+            "line_no_arrow": "_NONE",
+            "line_with_arrow": "_ARROW",
+            "spline_with_arrow": "_ARROW",  # MLeader uses arrow style, not spline type
+            "spline_no_arrow": "_NONE",
+        }
+
+        leader_type_lower = leader_type.lower()
+        if leader_type_lower not in leader_type_to_arrow:
+            raise InvalidParameterError(
+                "leader_type",
+                leader_type,
+                f"one of: {', '.join(leader_type_to_arrow.keys())}",
+            )
+
+        arrow_style = leader_type_to_arrow[leader_type_lower]
+
+        # Normalize points - first point is base, rest are the leader line
+        normalized_points = [CADInterface.normalize_coordinate(p) for p in points]
+
+        # For MLeader, base_point is where text goes (usually first point)
+        # and leader_groups contains the line points
+        base_point = normalized_points[0]
+        leader_group = normalized_points  # Include all points in the leader line
+
+        # Use draw_mleader internally with a single group
+        # This ensures text is always rendered correctly
+        return self.draw_mleader(
+            base_point=base_point,
+            leader_groups=[leader_group],
+            text=text,
+            text_height=text_height,
+            layer=layer,
+            color=color,
+            arrow_style=arrow_style,
+            _skip_refresh=_skip_refresh,
+        )
+
+    def draw_mleader(
+        self,
+        base_point: Coordinate,
+        leader_groups: List[List[Coordinate]],
+        text: Optional[str] = None,
+        text_height: float = 2.5,
+        layer: str = "0",
+        color: str | int = "white",
+        arrow_style: str = "_ARROW",
+        _skip_refresh: bool = False,
+    ) -> str:
+        """Draw a multi-leader with multiple arrow lines.
+
+        Args:
+            base_point: Base point for annotation
+            leader_groups: List of point lists, each defining one leader line
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+        """
+        document = self._get_document("draw_mleader")
+
+        if not leader_groups:
+            raise InvalidParameterError("leader_groups", leader_groups, "at least 1 group")
+
+        for i, group in enumerate(leader_groups):
+            if len(group) < 2:
+                raise InvalidParameterError(
+                    f"leader_groups[{i}]", group, "at least 2 points per group"
+                )
+
+        # Normalize base point to 3D
+        base_pt = CADInterface.normalize_coordinate(base_point)
+        base_array = self._to_variant_array(base_pt)
+
+        try:
+            # Create MLeader with base point
+            # Note: ZWCAD/AutoCAD AddMLeader often takes (PointsArray, Index)
+            # We use just the base point for initial creation, or the first group's points?
+            # AddMLeader documentation says: Adds an MLeader object to the drawing.
+            # RetVal = object.AddMLeader(pointsArray, leaderIndex)
+            
+            # Use the first group's points for the initial creation if possible, 
+            # but AddMLeader expects a points array. 
+            # If we pass just base_array, it might fail if it expects more points.
+            # However, typical usage is creating with the full point list of the first leader.
+            
+            first_group = leader_groups[0]
+            normalized_first_group = [CADInterface.normalize_coordinate(p) for p in first_group]
+            variant_first_group = self._points_to_variant_array(normalized_first_group)
+            
+            # Create the MLeader
+            # index 0 is usually the leader index to add to
+            try:
+                result = document.ModelSpace.AddMLeader(variant_first_group, 0)
+            except Exception as e:
+                # Try without index if 2 arguments failed
+                 logger.debug(f"AddMLeader(pts, 0) failed, trying AddMLeader(pts): {e}")
+                 result = document.ModelSpace.AddMLeader(variant_first_group)
+
+            # Handle tuple return (common in comtypes for some out-params or results)
+            mleader = None
+            if isinstance(result, tuple):
+                mleader = result[0]
+            else:
+                mleader = result
+
+            if not mleader:
+                raise RuntimeError("AddMLeader returned None or empty tuple")
+
+            # Helper to safely set properties
+            def set_prop(obj, prop, val):
+                try:
+                    setattr(obj, prop, val)
+                except Exception as ex:
+                    logger.warning(f"Could not set {prop}={val}: {ex}")
+
+            # Set Content (Text)
+            if text:
+                # ContentType: 2 = MText
+                set_prop(mleader, "ContentType", 2)
+                set_prop(mleader, "TextString", text)
+                
+                # Attempt to set text height if possible
+                try:
+                    # Some MLeaders expose TextHeight directly
+                    mleader.TextHeight = text_height
+                except:
+                    # Otherwise try via MText attribute if exposed
+                    try:
+                        mleader.MText.Height = text_height
+                    except:
+                        pass
+            else:
+                set_prop(mleader, "ContentType", 0) # None
+
+            # Set Arrow Style
+            try:
+                mleader.ArrowHeadSymbol = arrow_style
+            except Exception as e:
+                logger.warning(f"Could not set arrow style '{arrow_style}': {e}")
+
+            # If there are additional leader groups, add them
+            if len(leader_groups) > 1:
+                for i, group in enumerate(leader_groups[1:], 1):
+                    normalized_group = [CADInterface.normalize_coordinate(p) for p in group]
+                    variant_group = self._points_to_variant_array(normalized_group)
+                    mleader.AddLeaderLine(variant_group)
+
+            # Force update
+            try:
+                mleader.Update()
+            except: pass
+
+            # Apply properties
+            self._apply_properties(mleader, layer, color)
+            self._track_entity(mleader, "mleader")
+
+            if not _skip_refresh:
+                self.refresh_view()
+
+            logger.debug(
+                f"Drew multi-leader with {len(leader_groups)} lines "
+                f"(arrow_style={arrow_style}, text={text})"
+            )
+            return str(mleader.Handle)
+
+        except Exception as e:
+            import traceback
+            logger.warning(f"AddMLeader workflow failed, stepping back to AddLeader compatibility mode. Error: {e}")
+            logger.debug(traceback.format_exc())
+            
+            # Fallback: Use AddLeader (classic style)
+            
+            # Create annotation object if text is present
+            annotation_obj = None
+            if text:
+                try:
+                    width = max(text_height * 2, text_height * len(text) * 0.6)
+                    annotation_obj = document.ModelSpace.AddMText(base_array, width, text)
+                    annotation_obj.Height = text_height
+                except Exception as text_err:
+                     logger.error(f"Failed to create MText for fallback leader: {text_err}")
+                     annotation_obj = None
+            else:
+                # Try creating empty MText for strict requirements
+                try:
+                     annotation_obj = document.ModelSpace.AddMText(base_array, text_height * 2, " ")
+                     annotation_obj.Height = text_height
+                except:
+                     annotation_obj = None
+
+            # Identify leader type based on arrow style
+            # 1 = acLineWithArrow, 0 = acLineNoArrow
+            leader_type = 1 
+            if arrow_style == "_NONE":
+                leader_type = 0
+            
+            handles = []
+            
+            # Create individual leaders for each group
+            for group in leader_groups:
+                normalized_group = [CADInterface.normalize_coordinate(p) for p in group]
+                variant_group = self._points_to_variant_array(normalized_group)
+                
+                try:
+                    # Note: AddLeader(PointsArray, Annotation, Type)
+                    leader = document.ModelSpace.AddLeader(
+                        variant_group, annotation_obj, leader_type
+                    )
+                    self._apply_properties(leader, layer, color)
+                    self._track_entity(leader, "leader")
+                    handles.append(str(leader.Handle))
+                except Exception as le:
+                    logger.error(f"Failed to create individual leader line: {le}")
+            
+            if not _skip_refresh:
+                self.refresh_view()
+                
+            if annotation_obj:
+                return str(annotation_obj.Handle)
+            elif handles:
+                return handles[0]
+            else:
+                raise RuntimeError(f"Failed to create any leader entities. Original error: {e}") from e

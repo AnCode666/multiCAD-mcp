@@ -8,25 +8,23 @@ Supports AutoCAD, ZWCAD, GstarCAD, and other COM-compatible CAD software.
 """
 
 import sys
+import webbrowser
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from __version__ import __version__, __title__
 from core import get_supported_cads
 from mcp_tools.helpers import setup_utf8_encoding, setup_logging
-from adapters.adapter_manager import auto_detect_cad
 from mcp_tools.tools import (
-    register_connection_tools,
+    register_session_tools,
     register_drawing_tools,
     register_layer_tools,
     register_file_tools,
     register_entity_tools,
-    register_simple_tools,
     register_export_tools,
-    register_debug_tools,
     register_block_tools,
 )
-from ui.resources import register_all_ui_resources
+from web.api import api_app
 
 # Setup at module load
 setup_utf8_encoding()
@@ -40,20 +38,18 @@ def register_all_tools():
     """Register all MCP tools with FastMCP.
 
     Organizes tools by category:
-    - Connection management
+    - Session management (connection, view, history)
     - Drawing operations
     - Layer management
     - File operations
     - Entity selection and manipulation
     - Block management
-    - Simple view and history tools
     - Export and data extraction
-    - Debug and diagnostic tools
     """
     logger.info("Registering MCP tools...")
 
-    register_connection_tools(mcp)
-    logger.debug("  ✓ Connection tools registered")
+    register_session_tools(mcp)
+    logger.debug("  ✓ Session tools registered")
 
     register_drawing_tools(mcp)
     logger.debug("  ✓ Drawing tools registered")
@@ -66,22 +62,12 @@ def register_all_tools():
 
     register_entity_tools(mcp)
     logger.debug("  ✓ Entity tools registered")
-    
+
     register_block_tools(mcp)
     logger.debug("  ✓ Block tools registered")
 
-    register_simple_tools(mcp)
-    logger.debug("  ✓ Simple tools registered")
-
     register_export_tools(mcp)
     logger.debug("  ✓ Export tools registered")
-
-    register_debug_tools(mcp)
-    logger.debug("  ✓ Debug tools registered")
-
-    # Register MCP Apps UI resources
-    register_all_ui_resources(mcp)
-    logger.debug("  ✓ UI resources registered")
 
     logger.info("All MCP tools registered successfully")
 
@@ -89,21 +75,58 @@ def register_all_tools():
 # Register tools at module load
 register_all_tools()
 
-# Auto-detect available CAD applications at startup
+# CAD connection is lazy-loaded on first tool use
 logger.info(f"Starting multiCAD-MCP server v{__version__}...")
 logger.info(f"Supported CAD types: {', '.join(get_supported_cads())}")
-
-try:
-    logger.info("Auto-detecting CAD applications...")
-    auto_detect_cad()
-except Exception as e:
-    logger.warning(f"Auto-detection failed (will attempt on first use): {e}")
+logger.info("CAD applications will be connected on first tool use (lazy loading)")
 
 
 if __name__ == "__main__":
+    import threading
+    import uvicorn
+
+    # Configuration
+    host = "127.0.0.1"
+    port = 8000
+
+    # Autodetect transport mode:
+    # - If stdin is a TTY (interactive terminal) → HTTP with dashboard
+    # - If stdin is a pipe (Claude Desktop, etc.) → stdio
+    use_stdio = not sys.stdin.isatty()
+
+    def run_dashboard():
+        """Helper to run uvicorn in a thread."""
+        logger.info(f"Starting dashboard on http://{host}:{port}")
+        # Open browser automatically
+        webbrowser.open(f"http://{host}:{port}")
+        uvicorn.run(api_app, host=host, port=port, log_level="warning")
+
     try:
-        logger.info("Starting MCP server loop...")
-        mcp.run()
+        if use_stdio:
+            logger.info("Starting multiCAD-MCP server in stdio mode...")
+
+            # Start dashboard in background
+            web_thread = threading.Thread(target=run_dashboard, daemon=True)
+            web_thread.start()
+
+            # Run MCP stdio
+            mcp.run(transport="stdio")
+        else:
+            logger.info("Starting multiCAD-MCP server in HTTP mode...")
+
+            # Mount dashboard on the same app
+            # Note: FastMCP.http_app allows mounting additional FastAPI apps
+            app = mcp.http_app()
+            app.mount("/", api_app)
+
+            logger.info(f"Access dashboard at http://{host}:{port}/")
+            logger.info(f"MCP endpoint at http://{host}:{port}/mcp")
+
+            # Open browser automatically
+            webbrowser.open(f"http://{host}:{port}")
+
+            uvicorn.run(app, host=host, port=port)
+
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
     except Exception as e:

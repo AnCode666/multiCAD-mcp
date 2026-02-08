@@ -1,494 +1,317 @@
 """
-Layer management tools.
+Unified layer management tool.
 
-Provides tools for:
-- Creating, listing, and deleting layers
-- Renaming, toggling visibility of multiple layers
-- Batch operations for efficient layer management
+Single manage_layers tool replaces all 9 legacy layer tools with
+a simple shorthand format for ~85% token reduction.
+
+SHORTHAND FORMAT (one per line):
+    create|name|color|lineweight  → create|walls|red|50
+    delete|name                   → delete|temp
+    rename|old|new                → rename|Layer1|furniture
+    on|names(,sep)                → on|walls,doors
+    off|names(,sep)               → off|Defpoints
+    set_color|name|color          → set_color|0|white
+    list                          → list
+    info                          → info
 """
 
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, Callable, List, Tuple
 
 from mcp.server.fastmcp import Context
 from pydantic import ValidationError
 
 from core.models import CreateLayerRequest
-from mcp_tools.decorators import cad_tool, cad_tool_with_ui, get_current_adapter
-from mcp_tools.helpers import result_message
+from mcp_tools.decorators import cad_tool, get_current_adapter
+from mcp_tools.shorthand import parse_layer_ops_input
 
 logger = logging.getLogger(__name__)
 
 
+# ========== Action Handlers ==========
+
+
+def _parse_layer_names(raw: Any) -> List[str]:
+    """Parse layer names from string array or object array formats."""
+    if not isinstance(raw, list):
+        raw = [raw]
+    names = []
+    for item in raw:
+        if isinstance(item, str):
+            names.append(item)
+        elif isinstance(item, dict):
+            name = item.get("name")
+            if name is not None:
+                names.append(str(name))
+        else:
+            names.append(str(item))
+    return names
+
+
+def _create(spec: Dict[str, Any]) -> Dict[str, Any]:
+    validated = CreateLayerRequest(
+        name=spec["name"],
+        color=spec.get("color", "white"),
+        lineweight=spec.get("lineweight", 25),
+    )
+    success = get_current_adapter().create_layer(
+        validated.name, validated.color, validated.lineweight
+    )
+    return {"name": spec["name"], "success": success}
+
+
+def _rename(spec: Dict[str, Any]) -> Dict[str, Any]:
+    old_name = spec["old_name"]
+    new_name = spec["new_name"]
+    success = get_current_adapter().rename_layer(old_name, new_name)
+    return {"old_name": old_name, "new_name": new_name, "success": success}
+
+
+def _delete(spec: Dict[str, Any]) -> Dict[str, Any]:
+    name = spec["name"]
+    success = get_current_adapter().delete_layer(name)
+    return {"name": name, "success": success}
+
+
+def _turn_on(spec: Dict[str, Any]) -> Dict[str, Any]:
+    names = _parse_layer_names(spec["names"])
+    results = []
+    for name in names:
+        success = get_current_adapter().turn_layer_on(name)
+        results.append({"name": name, "success": success})
+    ok = sum(1 for r in results if r["success"])
+    return {"success": ok == len(names), "count": ok, "layers": results}
+
+
+def _turn_off(spec: Dict[str, Any]) -> Dict[str, Any]:
+    names = _parse_layer_names(spec["names"])
+    results = []
+    for name in names:
+        success = get_current_adapter().turn_layer_off(name)
+        results.append({"name": name, "success": success})
+    ok = sum(1 for r in results if r["success"])
+    return {"success": ok == len(names), "count": ok, "layers": results}
+
+
+def _set_color(spec: Dict[str, Any]) -> Dict[str, Any]:
+    name = spec["name"]
+    color = spec["color"]
+    success = get_current_adapter().set_layer_color(name, color)
+    return {"name": name, "color": color, "success": success}
+
+
+def _list(spec: Dict[str, Any]) -> Dict[str, Any]:
+    layers = get_current_adapter().list_layers()
+    return {"success": True, "count": len(layers), "layers": layers}
+
+
+def _is_on(spec: Dict[str, Any]) -> Dict[str, Any]:
+    name = spec["name"]
+    is_on = get_current_adapter().is_layer_on(name)
+    return {
+        "success": True,
+        "name": name,
+        "on": is_on,
+        "detail": f"Layer '{name}' is {'on (visible)' if is_on else 'off (hidden)'}",
+    }
+
+
+def _info(spec: Dict[str, Any]) -> Dict[str, Any]:
+    adapter = get_current_adapter()
+    layer_names = adapter.list_layers()
+
+    layers = []
+    for name in layer_names:
+        try:
+            layer_info = {
+                "name": name,
+                "on": adapter.is_layer_on(name),
+            }
+            try:
+                doc = adapter.get_document()
+                layer = doc.Layers.Item(name)
+                layer_info["color"] = layer.color
+                layer_info["locked"] = layer.Lock
+                layer_info["frozen"] = layer.Freeze
+                layer_info["current"] = doc.ActiveLayer.Name == name
+            except Exception:
+                pass
+            layers.append(layer_info)
+        except Exception as e:
+            logger.debug(f"Error getting info for layer {name}: {e}")
+            layers.append({"name": name, "on": True})
+
+    return {
+        "success": True,
+        "count": len(layers),
+        "layers": layers,
+        "_meta": {
+            "ui": {
+                "resourceUri": "ui://multicad/layer_panel",
+                "data": {"layers": layers},
+            }
+        },
+    }
+
+
+# Dispatch table: action -> (handler, required_fields)
+LAYER_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
+    "create": (_create, ["name"]),
+    "rename": (_rename, ["old_name", "new_name"]),
+    "delete": (_delete, ["name"]),
+    "turn_on": (_turn_on, ["names"]),
+    "turn_off": (_turn_off, ["names"]),
+    "set_color": (_set_color, ["name", "color"]),
+    "list": (_list, []),
+    "is_on": (_is_on, ["name"]),
+    "info": (_info, []),
+}
+
+
+def _validate_required_fields(
+    spec: Dict[str, Any], required: List[str], action: str
+) -> Optional[str]:
+    missing = [f for f in required if f not in spec]
+    if missing:
+        return f"'{action}' requires fields: {', '.join(missing)}"
+    return None
+
+
+# ========== Tool Registration ==========
+
+
 def register_layer_tools(mcp):
-    """Register layer management tools with FastMCP.
+    """Register unified layer management tool with FastMCP."""
 
-    Args:
-        mcp: FastMCP instance
-    """
-
-    # ========== SINGLE LAYER OPERATIONS ==========
-
-    @cad_tool(mcp, "create_layer")
-    def create_layer(
+    @cad_tool(mcp, "manage_layers")
+    def manage_layers(
         ctx: Context,
-        name: str,
-        color: str = "white",
-        lineweight: int = 25,
+        operations: str,
         cad_type: Optional[str] = None,
     ) -> str:
         """
-        Create a new layer.
+        Manage layers: create, modify, query, or change visibility.
 
         Args:
-            name: Layer name
-            color: Layer color
-            lineweight: Layer line weight
+            operations: Operations in SHORTHAND format (one per line):
+
+                create|name|color|lineweight  → create|walls|red|50
+                delete|name                   → delete|temp
+                rename|old|new                → rename|Layer1|furniture
+                on|names(,sep)                → on|walls,doors
+                off|names(,sep)               → off|Defpoints
+                set_color|name|color          → set_color|0|white
+                is_on|name                    → is_on|walls
+                list                          → list
+                info                          → info
+
+                DEFAULTS: color=white, lineweight=25
+
+                Example:
+                    create|walls|red
+                    create|doors|blue
+                    off|Defpoints,notes
+                    set_color|0|white
+
+                JSON format also supported for backwards compatibility.
+
             cad_type: CAD application to use
 
         Returns:
-            Status message
+            JSON result with per-operation status
         """
         try:
-            # Use Pydantic validation
-            validated = CreateLayerRequest(
-                name=name, color=color, lineweight=lineweight
-            )
-            success = get_current_adapter().create_layer(
-                validated.name, validated.color, validated.lineweight
-            )
-            return result_message("create layer", success, name)
-        except ValidationError as e:
-            error_msg = f"Validation error: {e.errors()[0]['msg']}"
-            logger.error(f"Validation error creating layer: {error_msg}")
-            return result_message("create layer", False, f"{name}: {error_msg}")
-
-    @cad_tool(mcp, "list_layers")
-    def list_layers(
-        ctx: Context,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        List all layers in the current drawing.
-
-        Args:
-            cad_type: CAD application to use
-
-        Returns:
-            Comma-separated list of layer names
-        """
-        layers = get_current_adapter().list_layers()
-        return f"Layers: {', '.join(layers)}"
-
-    @cad_tool(mcp, "is_layer_on")
-    def is_layer_on(
-        ctx: Context,
-        name: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Check if a layer is visible (turned on).
-
-        Args:
-            name: Layer name
-            cad_type: CAD application to use
-
-        Returns:
-            Layer visibility status
-        """
-        is_on = get_current_adapter().is_layer_on(name)
-        status = "on (visible)" if is_on else "off (hidden)"
-        return f"Layer '{name}' is {status}"
-
-    @cad_tool_with_ui(mcp, "get_layers_info", ui_resource="layer_panel")
-    def get_layers_info(
-        ctx: Context,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Get detailed information about all layers in the current drawing.
-
-        Returns comprehensive layer data including:
-        - Name: Layer name
-        - Color: Layer color (ACI index or name)
-        - On: Whether layer is visible
-        - Locked: Whether layer is locked
-        - Frozen: Whether layer is frozen
-        - Current: Whether this is the active layer
-
-        In MCP Apps-compatible hosts (Claude Desktop, VS Code), this tool provides
-        an interactive layer panel with visual color indicators and search.
-
-        Args:
-            cad_type: CAD application to use (autocad, zwcad, gcad, bricscad)
-
-        Returns:
-            JSON result with layer information and UI metadata
-        """
-        try:
-            adapter = get_current_adapter()
-
-            # Get layer names first
-            layer_names = adapter.list_layers()
-
-            # Build detailed layer info
-            layers = []
-            for name in layer_names:
-                try:
-                    layer_info = {
-                        "name": name,
-                        "on": adapter.is_layer_on(name),
-                    }
-                    # Try to get additional properties if available
-                    try:
-                        doc = adapter.get_document()
-                        layer = doc.Layers.Item(name)
-                        layer_info["color"] = layer.color
-                        layer_info["locked"] = layer.Lock
-                        layer_info["frozen"] = layer.Freeze
-                        # Check if current layer
-                        layer_info["current"] = doc.ActiveLayer.Name == name
-                    except Exception:
-                        # Fallback if detailed properties not available
-                        pass
-                    layers.append(layer_info)
-                except Exception as e:
-                    logger.debug(f"Error getting info for layer {name}: {e}")
-                    layers.append({"name": name, "on": True})
-
-            result = {
-                "success": True,
-                "count": len(layers),
-                "message": f"Found {len(layers)} layers",
-                "layers": layers,
-                "_meta": {
-                    "ui": {
-                        "resourceUri": "ui://multicad/layer_panel",
-                        "data": {"layers": layers},
-                    }
-                },
-            }
-
-            return json.dumps(result, indent=2)
-
+            ops_data = parse_layer_ops_input(operations)
         except Exception as e:
-            logger.error(f"Get layers info failed: {e}")
-            result = {
-                "success": False,
-                "count": 0,
-                "message": f"Error getting layer info: {str(e)}",
-                "layers": [],
-            }
-            return json.dumps(result, indent=2)
-
-    # ========== BATCH OPERATIONS (Multiple Layers) ==========
-
-    @cad_tool(mcp, "rename_layers")
-    def rename_layers(
-        ctx: Context,
-        renames: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Rename multiple layers in a single operation.
-
-        Args:
-            renames: JSON array of rename specifications.
-                     Example: [{"old_name": "Layer1", "new_name": "NewName1"}, {"old_name": "Layer2", "new_name": "NewName2"}]
-                     Fields: old_name (required), new_name (required)
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with rename operation status
-        """
-        try:
-            renames_data = json.loads(renames) if isinstance(renames, str) else renames
-            if not isinstance(renames_data, list):
-                renames_data = [renames_data]
-
-            results = []
-            for i, rename_spec in enumerate(renames_data):
-                try:
-                    old_name = rename_spec["old_name"]
-                    new_name = rename_spec["new_name"]
-                    success = get_current_adapter().rename_layer(old_name, new_name)
-                    results.append(
-                        {
-                            "index": i,
-                            "old_name": old_name,
-                            "new_name": new_name,
-                            "success": success,
-                        }
-                    )
-                except Exception as e:
-                    logger.error(f"Error renaming layer {i}: {e}")
-                    results.append({"index": i, "success": False, "error": str(e)})
-
-            return json.dumps(
-                {
-                    "total": len(renames_data),
-                    "renamed": sum(1 for r in results if r["success"]),
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
             return json.dumps(
                 {
                     "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
+                    "error": f"Invalid input: {str(e)}",
                     "total": 0,
-                    "renamed": 0,
+                    "succeeded": 0,
                     "results": [],
                 },
                 indent=2,
             )
 
-    @cad_tool(mcp, "delete_layers")
-    def delete_layers(
-        ctx: Context,
-        layer_names: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Delete multiple layers in a single operation.
+        results = []
 
-        Args:
-            layer_names: JSON array of layer names to delete.
-                         Example: ["Layer1", "Layer2", "Layer3"]
-                         Or JSON array of objects: [{"name": "Layer1"}, {"name": "Layer2"}]
-            cad_type: CAD application to use
+        for i, spec in enumerate(ops_data):
+            action = spec.get("action")
 
-        Returns:
-            JSON result with delete operation status
-        """
-        try:
-            data = (
-                json.loads(layer_names) if isinstance(layer_names, str) else layer_names
-            )
-            if not isinstance(data, list):
-                data = [data]
-
-            # Handle both string array and object array formats
-            names: list[str] = []
-            for item in data:
-                if isinstance(item, str):
-                    names.append(item)
-                elif isinstance(item, dict):
-                    name = item.get("name")
-                    if name is not None:
-                        names.append(str(name))
-                else:
-                    names.append(str(item))
-
-            results = []
-            for i, name in enumerate(names):
-                try:
-                    success = get_current_adapter().delete_layer(name)
-                    results.append({"index": i, "name": name, "success": success})
-                except Exception as e:
-                    logger.error(f"Error deleting layer {i} ({name}): {e}")
-                    results.append(
-                        {"index": i, "name": name, "success": False, "error": str(e)}
-                    )
-
-            return json.dumps(
-                {
-                    "total": len(names),
-                    "deleted": sum(1 for r in results if r["success"]),
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total": 0,
-                    "deleted": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
-
-    @cad_tool(mcp, "turn_layers_on")
-    def turn_layers_on(
-        ctx: Context,
-        layer_names: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Turn on (make visible) multiple layers in a single operation.
-
-        Args:
-            layer_names: JSON array of layer names to turn on.
-                         Example: ["Layer1", "Layer2", "Layer3"]
-                         Or JSON array of objects: [{"name": "Layer1"}, {"name": "Layer2"}]
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with operation status
-        """
-        try:
-            data = (
-                json.loads(layer_names) if isinstance(layer_names, str) else layer_names
-            )
-            if not isinstance(data, list):
-                data = [data]
-
-            # Handle both string array and object array formats
-            names: list[str] = []
-            for item in data:
-                if isinstance(item, str):
-                    names.append(item)
-                elif isinstance(item, dict):
-                    name = item.get("name")
-                    if name is not None:
-                        names.append(str(name))
-                else:
-                    names.append(str(item))
-
-            results = []
-            for i, name in enumerate(names):
-                try:
-                    success = get_current_adapter().turn_layer_on(name)
-                    results.append({"index": i, "name": name, "success": success})
-                except Exception as e:
-                    logger.error(f"Error turning on layer {i} ({name}): {e}")
-                    results.append(
-                        {"index": i, "name": name, "success": False, "error": str(e)}
-                    )
-
-            return json.dumps(
-                {
-                    "total": len(names),
-                    "turned_on": sum(1 for r in results if r["success"]),
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total": 0,
-                    "turned_on": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
-
-    @cad_tool(mcp, "turn_layers_off")
-    def turn_layers_off(
-        ctx: Context,
-        layer_names: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Turn off (hide) multiple layers in a single operation.
-
-        Args:
-            layer_names: JSON array of layer names to turn off.
-                         Example: ["Layer1", "Layer2", "Layer3"]
-                         Or JSON array of objects: [{"name": "Layer1"}, {"name": "Layer2"}]
-            cad_type: CAD application to use
-
-        Returns:
-            JSON result with operation status
-        """
-        try:
-            data = (
-                json.loads(layer_names) if isinstance(layer_names, str) else layer_names
-            )
-            if not isinstance(data, list):
-                data = [data]
-
-            # Handle both string array and object array formats
-            names: list[str] = []
-            for item in data:
-                if isinstance(item, str):
-                    names.append(item)
-                elif isinstance(item, dict):
-                    name = item.get("name")
-                    if name is not None:
-                        names.append(str(name))
-                else:
-                    names.append(str(item))
-
-            results = []
-            for i, name in enumerate(names):
-                try:
-                    success = get_current_adapter().turn_layer_off(name)
-                    results.append({"index": i, "name": name, "success": success})
-                except Exception as e:
-                    logger.error(f"Error turning off layer {i} ({name}): {e}")
-                    results.append(
-                        {"index": i, "name": name, "success": False, "error": str(e)}
-                    )
-
-            return json.dumps(
-                {
-                    "total": len(names),
-                    "turned_off": sum(1 for r in results if r["success"]),
-                    "results": results,
-                },
-                indent=2,
-            )
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
-                    "total": 0,
-                    "turned_off": 0,
-                    "results": [],
-                },
-                indent=2,
-            )
-
-    # ========== LAYER COLOR OPERATIONS ==========
-
-    @cad_tool(mcp, "set_layer_color")
-    def set_layer_color(
-        ctx: Context,
-        layer_name: str,
-        color: str,
-        cad_type: Optional[str] = None,
-    ) -> str:
-        """
-        Set the color of a layer.
-
-        Args:
-            layer_name: Name of the layer to modify
-            color: Color name (red, blue, green, etc.) or ACI index (1-255)
-            cad_type: CAD application to use
-
-        Returns:
-            Status message
-
-        Example:
-            set_layer_color(layer_name="Walls", color="red")
-            set_layer_color(layer_name="Doors", color="blue")
-
-        Note:
-            - Uses modern TrueColor property (recommended by Autodesk)
-            - Available colors: red, blue, green, yellow, cyan, magenta, white, gray, etc.
-            - Color 'bylayer' (256) is not valid for layers
-        """
-        adapter = get_current_adapter()
-
-        try:
-            success = adapter.set_layer_color(layer_name, color)
-            if success:
-                return result_message(
-                    f"Set layer '{layer_name}' color to '{color}'", True
+            if not action:
+                results.append(
+                    {
+                        "index": i,
+                        "success": False,
+                        "error": "Missing 'action' field. Supported: "
+                        + ", ".join(LAYER_DISPATCH.keys()),
+                    }
                 )
-            else:
-                return result_message(
-                    f"Failed to set layer '{layer_name}' color", False
+                continue
+
+            action_lower = action.lower()
+            dispatch_entry = LAYER_DISPATCH.get(action_lower)
+
+            if not dispatch_entry:
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": f"Unknown action '{action}'. Supported: "
+                        + ", ".join(LAYER_DISPATCH.keys()),
+                    }
                 )
-        except Exception as e:
-            return result_message(f"Error setting layer color: {str(e)}", False)
+                continue
+
+            handler, required_fields = dispatch_entry
+
+            field_error = _validate_required_fields(spec, required_fields, action_lower)
+            if field_error:
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": field_error,
+                    }
+                )
+                continue
+
+            try:
+                result = handler(spec)
+                results.append({"index": i, "action": action_lower, **result})
+            except ValidationError as e:
+                error_msg = f"Validation error: {e.errors()[0]['msg']}"
+                logger.error(
+                    f"Validation error in layer op {i} ({action_lower}): {error_msg}"
+                )
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": error_msg,
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error in layer op {i} ({action_lower}): {e}")
+                results.append(
+                    {
+                        "index": i,
+                        "action": action_lower,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
+
+        return json.dumps(
+            {
+                "total": len(ops_data),
+                "succeeded": sum(1 for r in results if r.get("success")),
+                "results": results,
+            },
+            indent=2,
+        )

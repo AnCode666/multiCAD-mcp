@@ -970,7 +970,7 @@ class AutoCADAdapter(CADInterface):
                 )
             if not (0 <= color_index <= 255):
                 raise ColorError(
-                    str(color_index), f"Invalid color index. Must be 0-255."
+                    str(color_index), "Invalid color index. Must be 0-255."
                 )
 
             # Create AcCmColor object (modern method)

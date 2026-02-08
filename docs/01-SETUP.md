@@ -68,7 +68,7 @@ multiCAD-mcp/
 │       ├── constants.py       # COLOR_MAP, etc.
 │       ├── helpers.py         # Utilities
 │       ├── decorators.py      # @cad_tool
-│       └── tools/             # 7 tool modules (47 tools)
+│       └── tools/             # 7 unified tools (54 commands)
 ├── tests/                     # 62 pytest tests
 ├── docs/                      # Documentation
 └── logs/                      # Auto-generated logs
@@ -79,20 +79,42 @@ multiCAD-mcp/
 ```powershell
 pytest tests/ -v                    # Run tests
 mypy src/                           # Type check
-flake8 src/                         # Lint code
+flake8 src/ --max-line-length 150   # Lint code
 black src/                          # Format code
 npx -y @modelcontextprotocol/inspector py src/server.py  # MCP Inspector
 ```
+
+## Git Workflow
+
+### Repository
+**URL**: https://github.com/AnCode666/multiCAD-mcp
+
+### Branch Naming
+- `feature/<description>` - New features
+- `fix/<description>` - Bug fixes
+- `refactor/<description>` - Refactoring
+- `docs/<description>` - Documentation
+
+### Commit Convention
+Use the following format: `<type>(<scope>): <subject>`
+- **feat**: New feature
+- **fix**: Bug fix
+- **docs**: Documentation
+- **refactor**: Code refactoring
+- **test**: Tests
+- **chore**: Build, dependencies
+
+**Example**: `git commit -m "feat(blocks): add insert_block tool"`
 
 ## Development Tips
 
 1. **Type hints everywhere** - enables IDE autocomplete
 2. **Absolute imports** - `from core import X`, not `from ..core`
 3. **Log operations** - use `logger.info()` and `logger.debug()`
-4. **Test first** - add tests for new features
-5. **Keep venv activated** - all commands use project's venv
+4. **Test first** - add tests before committing (`pytest tests/ -v`)
+5. **Format & Lint** - run `black src/` and `mypy src/` before push
 
 ## Next Steps
 
-- [02-ARCHITECTURE.md](02-ARCHITECTURE.md) - Understand the design
-- [03-EXTENDING.md](03-EXTENDING.md) - Add new features
+- [02-ARCHITECTURE.md](02-ARCHITECTURE.md) - Understand the design and how to extend it
+- [04-TROUBLESHOOTING.md](04-TROUBLESHOOTING.md) - Debugging guide

@@ -9,7 +9,7 @@ multiCAD-mcp is an MCP server that lets you control your CAD software using AI a
 ## Features
 
 - **Multiple CAD Support**: Works with AutoCAD®, ZWCAD®, GstarCAD®, and BricsCAD®
-- **54 MCP Tools**: Comprehensive set of drawing, layer, entity, block, and file management tools
+- **7 Unified MCP Tools**: Clean access to **54 CAD commands** for drawing, layers, entities, blocks, and files
 - **Block Creation** (v0.1.2+): Create blocks from entities or user selection
 - **Batch Operations** (v0.1.1+): 60-70% fewer API calls when managing multiple items
 - **Simple command execution**: "Draw a red circle at 50,50 with radius 25" - no complex syntax needed
@@ -85,158 +85,41 @@ Replace `C:\path\to\multiCAD-mcp` with your actual installation path.
 
 ### Direct Tool Calls
 
-multiCAD-mcp provides **54 MCP tools** with batch operation support for efficiency:
+multiCAD-mcp provides **7 unified MCP tools** that provide access to **54 different CAD commands**. This architecture is designed for high efficiency, allowing multiple operations to be dispatched in single calls, reducing API overhead by up to 70%.
 
-#### Drawing (9 tools - 7 batch optimized)
+- **Drawing & Shapes**: Lines, circles, arcs, rectangles, polylines, and splines.
+- **Block Management**: Create blocks (from entities or selection), insert (batch/single), list, and audit.
+- **Layer Management**: Create, list, rename/delete (batch), and toggle visibility.
+- **Entity Manipulation**: Move, rotate, scale, copy/paste, and selection (by type/layer/color).
+- **Property Management**: Change color/layer (batch/single) and set color ByLayer.
+- **Data & Export**: Extract data (JSON), export to Excel (total or selected), and entity debug.
+- **View & Navigation**: Zoom extents, fit view, and undo/redo operations.
+- **Files & Session**: Save (DWG/DXF/PDF), new/close drawings, and multi-drawing switching.
+- **Connection & Control**: Connection lifecycle, diagnostics, and natural language fallback.
 
-**Batch Operations** (recommended for multiple items):
+> [!TIP]
+> Use **batch tools** (e.g., `draw_lines`, `rename_layers`) when working with multiple items to minimize token usage and execution time.
 
-- **draw_lines**: Draw multiple lines in one call
-- **draw_circles**: Draw multiple circles in one call
-- **draw_arcs**: Draw multiple arcs in one call
-- **draw_rectangles**: Draw multiple rectangles in one call
-- **draw_polylines**: Draw multiple polylines in one call
-- **draw_texts**: Add multiple text labels in one call
-- **add_dimensions**: Add multiple dimensions in one call
-
-**Block Operations**:
-
-- **create_block**: Create blocks from entity handles or user selection
-
-**Helper Tools**:
-
-- **draw_circle_and_line**: Draw circle and tangent line
-
-#### Entity Operations (12 tools)
-
-**Batch Operations** (for color/layer changes):
-
-- **change_entities_colors**: Change colors of multiple entity groups
-- **change_entities_layers**: Move multiple entity groups to different layers
-
-**Standard Operations**:
-
-- **select_by_color/layer/type**: Select entities by criteria
-- **move_entities**: Move selected entities
-- **rotate_entities**: Rotate entities around a point
-- **scale_entities**: Scale entities by factor
-- **copy_entities**: Copy entities to clipboard
-- **paste_entities**: Paste from clipboard
-- **change_entity_color/layer**: Modify single entity properties
-
-#### Layer Management (7 tools - 4 batch optimized)
-
-**Batch Operations** (recommended for multiple layers):
-
-- **rename_layers**: Rename multiple layers in one call
-- **delete_layers**: Delete multiple layers in one call
-- **turn_layers_on**: Show multiple layers in one call
-- **turn_layers_off**: Hide multiple layers in one call
-
-**Standard Operations**:
-
-- **create_layer**: Create new layers
-- **list_layers**: List all layers
-- **is_layer_on**: Check layer visibility status
-
-#### File Operations (5 tools)
-
-- **save_drawing**: Save to DWG, DXF, or PDF
-- **new_drawing**: Create blank drawing
-- **close_drawing**: Close active drawing
-- **get_open_drawings**: List open files
-- **switch_drawing**: Switch between open drawings
-
-#### Data Export (4 tools)
-
-- **export_drawing_to_excel**: Export all entities to Excel file
-- **extract_drawing_data**: Get all entity data as JSON
-- **export_selected_to_excel**: Export only selected entities to Excel file
-- **extract_selected_data**: Get only selected entity data as JSON
-
-#### Connection & Control (9 tools)
-
-- **connect_cad/disconnect_cad**: Manage CAD connections
-- **check_connection**: Verify connection status
-- **get_active_cad_type**: Get current CAD application
-- **zoom_extents**: Fit view to all entities
-- **undo/redo**: Undo/redo operations
-- **get_server_info/get_mcp_config**: Server diagnostics
-- **execute_natural_command**: Natural language fallback
-
-### Batch Operations (v0.1.1+)
-
-New batch operation tools reduce API calls by **60-70%** when working with multiple items:
-
-#### Example: Drawing Multiple Shapes
-
-Instead of 10 separate calls:
-
-```json
-draw_lines('[
-  {"start": "0,0", "end": "10,10", "color": "red"},
-  {"start": "20,20", "end": "30,30", "color": "blue"},
-  {"start": "40,40", "end": "50,50", "color": "green"}
-]')
-```
-
-#### Example: Managing Multiple Layers
-
-```json
-rename_layers('[
-  {"old_name": "Layer1", "new_name": "Primary"},
-  {"old_name": "Layer2", "new_name": "Secondary"}
-]')
-
-turn_layers_off('["Reference", "Hidden", "Notes"]')
-```
-
-**Benefits**:
-
-- Single API call for multiple operations
-- Detailed per-item error reporting
-- Structured JSON responses
-- Faster execution and lower token usage
-
-### Selected Entity Export (v0.1.1+)
+### Selected Entity Export
 
 Export or extract data from only the entities currently selected in your CAD viewport:
 
 ```text
 # Export selected entities to Excel
 export_selected_to_excel(filename="selected_entities.xlsx")
-→ Exports only selected entities with all properties
 
 # Extract selected entity data as JSON
 extract_selected_data()
-→ Returns JSON array with selected entities' data
 ```
-
-**Use Cases**:
-
-- Export a subset of entities without exporting the entire drawing
-- Analyze properties of selected features
-- Create reports for specific design elements
-- Work with portions of large drawings efficiently
 
 ### Complex Tasks
 
-You can also ask your AI assistant to execute complex tasks that require multiple drawing tools:
-
-- **Draw the graphic of an equation**: Fast and accurate drawing of complex shapes
-- **Draw a title block**: Automate drawing layout related tasks
-- **Draw a table with data**: Automate the creation of data tables in drawings
+You can ask your AI assistant to execute complex tasks that require multiple tools, such as drawing graphs of equations, complex title blocks, or data tables.
 
 ### Natural Language Fallback
 
-For AI assistants: if direct tool mapping fails, the **execute_natural_command** tool can trigger simple commands using natural language:
+If direct tool mapping fails, the `execute_natural_command` tool can trigger simple commands using natural language (e.g., "Draw a red line from 0,0 to 100,100").
 
-```text
-"Draw a red line from 0,0 to 100,100"
-"Create a blue circle at 50,50 with radius 25"
-```
-
-**Note**: This is a fallback mechanism. AI assistants should prefer direct tool calls for better reliability and type safety.
 
 ## Configuration
 
@@ -337,9 +220,9 @@ Available levels (from most to least verbose):
 
 **Version 0.1.2** - Block creation, code optimization, and set color by layer
 
-- **47 MCP tools** covering all major CAD operations (added `create_block`)
+- **7 Unified MCP tools** providing access to **54 CAD commands**
 - **Block creation** from entity handles or user selection
-- **13 batch operation tools** for 60-70% API call reduction
+- **Batch operation support** for ~70% API call reduction
 - **Selection-based export** - Export only selected entities to Excel/JSON
 - Comprehensive error handling
 - Full type safety with Python type hints

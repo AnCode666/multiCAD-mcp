@@ -35,7 +35,7 @@ black src/ && mypy src/
 ## Architecture
 
 **Three Layers**:
-1. **FastMCP Server** (`src/server.py`) - 54 MCP tools
+1. **FastMCP Server** (`src/server.py`) - 7 unified MCP tools
 2. **Core** (`src/core/`) - Interfaces, config, exceptions
 3. **Adapters** (`src/adapters/`) - Mixin-based universal adapter
 
@@ -161,6 +161,9 @@ Just add to `src/config.json`:
 ```json
 "newcad": {"prog_id": "NewCAD.Application", "startup_wait_time": 15.0}
 ```
+The universal adapter handles it automatically.
+
+---
 
 ---
 
@@ -213,4 +216,4 @@ git commit -m "fix(adapter): description"
 
 ---
 
-**Version**: 0.1.2 | **Tests**: 62 | **Tools**: 54
+**Version**: 0.1.2 | **Commands**: 54 | **Unified Tools**: 7

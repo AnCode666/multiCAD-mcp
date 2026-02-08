@@ -371,6 +371,70 @@ class CADInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    def draw_leader(
+        self,
+        points: List[Coordinate],
+        text: Optional[str] = None,
+        text_height: float = 2.5,
+        layer: str = "0",
+        color: str | int = "white",
+        leader_type: str = "line_with_arrow",
+        _skip_refresh: bool = False,
+    ) -> str:
+        """
+        Draw a leader (dimension leader line) with optional text annotation.
+
+        Args:
+            points: List of control points (minimum 2 for simple, multiple for multi-arrow)
+            text: Optional annotation text
+            text_height: Height of annotation text (default: 2.5)
+            layer: Layer name
+            color: Color name or index
+            leader_type: Type of leader:
+                - "line_with_arrow": Straight lines with arrow (default)
+                - "line_no_arrow": Straight lines without arrow
+                - "spline_with_arrow": Smooth spline with arrow
+                - "spline_no_arrow": Smooth spline without arrow
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+
+        Returns:
+            str: Entity handle/ID
+        """
+        pass
+
+    @abstractmethod
+    def draw_mleader(
+        self,
+        base_point: Coordinate,
+        leader_groups: List[List[Coordinate]],
+        text: Optional[str] = None,
+        text_height: float = 2.5,
+        layer: str = "0",
+        color: str | int = "white",
+        arrow_style: str = "_ARROW",
+        _skip_refresh: bool = False,
+    ) -> str:
+        """
+        Draw a multi-leader with multiple arrow lines pointing to same annotation.
+
+        Args:
+            base_point: Base point where annotation text is placed
+            leader_groups: List of leader line paths, each with 2+ points
+                Example: [[(0,0), (10,10)], [(0,0), (20,-5)], [(0,0), (15,20)]]
+            text: Optional annotation text
+            text_height: Height of annotation text (default: 2.5)
+            layer: Layer name
+            color: Color name or index
+            arrow_style: Arrow head style (default: "_ARROW")
+                Supported: "_ARROW", "_DOT", "_CLOSED_FILLED", "_OBLIQUE", "_OPEN", etc.
+            _skip_refresh: Internal flag to skip view refresh (used for batch operations)
+
+        Returns:
+            str: Entity handle/ID
+        """
+        pass
+
     # ========== Array Operations ==========
 
     @abstractmethod

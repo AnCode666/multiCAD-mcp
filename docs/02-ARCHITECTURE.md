@@ -42,23 +42,22 @@
 
 ### 1. Server (`server.py`)
 
-Entry point that registers 54 MCP tools via FastMCP. Auto-detects CAD on startup.
+Entry point that registers **7 unified MCP tools** via FastMCP. These tools act as dispatchers for **54 specific CAD commands**.
 
 ### 2. Tools (`mcp_tools/tools/`)
 
-8 modules with 54 tools:
+7 modules, each providing one unified tool that dispatches multiple CAD commands:
 
-| Module | Tools | Purpose |
-|--------|-------|---------|
-| connection.py | 4 | Connect/disconnect, status |
-| drawing.py | 10 | Draw shapes, create blocks |
-| blocks.py | 5 | Block management |
-| layers.py | 8 | Layer management |
-| files.py | 5 | Save, open, close |
-| entities.py | 13 | Select, move, rotate, scale |
-| simple.py | 3 | Zoom, undo, redo |
-| export.py | 4 | Excel export |
-| debug.py | 2 | Diagnostics |
+| Module | Unified Tool | Commands | Purpose |
+|--------|--------------|----------|---------|
+| session.py | `manage_session` | 4 | Connection, view, history |
+| drawing.py | `draw_entities` | 10 | Unified entity creation |
+| blocks.py | `manage_blocks` | 5 | Block management |
+| layers.py | `manage_layers` | 8 | Layer management |
+| files.py | `manage_files` | 5 | File operations |
+| entities.py | `manage_entities` | 13 | Select, move, rotate, scale |
+| export.py | `export_data` | 4 | Data extraction & Excel |
+| debug.py | `debug_entities` | 2 | Internal diagnostics |
 
 ### 3. Adapter (`adapters/`)
 
@@ -194,6 +193,26 @@ MultiCADError
 - Context-rich error messages
 - Granular error handling
 - Clear debugging info
+
+---
+
+## Extending the System
+
+### 1. Adding a New Drawing Operation
+
+1.  **Define in `CADInterface`**: Add the abstract method to `src/core/cad_interface.py`.
+2.  **Implement in Mixin**: Add the implementation to the relevant mixin in `src/adapters/mixins/`.
+3.  **Add MCP Tool**: Register the tool in `src/mcp_tools/tools/` using the `@cad_tool` decorator.
+4.  **Add Test**: Ensure the new operation is covered in `tests/`.
+
+### 2. Adding a New CAD Application
+
+If it's **COM-compatible** (same API as AutoCAD), just add its `prog_id` to `src/config.json`. The universal adapter handles it automatically.
+
+### 3. Adding a New Tool Category
+
+1.  **Create Module**: Add a new file in `src/mcp_tools/tools/`.
+2.  **Register in Server**: Call the registration function in `src/server.py`.
 
 ---
 

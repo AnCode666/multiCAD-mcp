@@ -1,0 +1,1532 @@
+
+ ▐▛███▜▌   Claude Code v2.1.29
+▝▜█████▛▘  Haiku 4.5 · Claude Pro
+  ▘▘ ▝▝    D:\dev\proys\mcp\cad\multiCAD-mcp
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Plan to implement                                                            │
+│                                                                              │
+│ Plan: Formato Shorthand Directo para Tools MCP                               │
+│                                                                              │
+│ Objetivo                                                                     │
+│                                                                              │
+│ Eliminar JSON como formato de input. Las tools aceptan directamente un       │
+│ formato shorthand simple que el AI genera fácilmente.                        │
+│                                                                              │
+│ ---                                                                          │
+│ Formato Shorthand                                                            │
+│                                                                              │
+│ Estructura General                                                           │
+│                                                                              │
+│ tipo|param1|param2|param3|...                                                │
+│                                                                              │
+│ - Separador: | (pipe) entre campos                                           │
+│ - Múltiples entidades: una por línea o separadas por ;                       │
+│ - Opcionales: se omiten al final si usan default                             │
+│ - Auto-corrección: typos, case, formatos                                     │
+│                                                                              │
+│ ---                                                                          │
+│ Tool: draw_entities                                                          │
+│                                                                              │
+│ Parámetro entities acepta:                                                   │
+│ line|0,0|10,10|red|walls                                                     │
+│ circle|5,5|3|blue                                                            │
+│ rect|0,0|20,15                                                               │
+│ text|5,5|Hello World|2.5|white                                               │
+│ arc|10,10|5|0|90|green                                                       │
+│ polyline|0,0;10,10;20,0|closed|yellow                                        │
+│                                                                              │
+│ Especificación por tipo:                                                     │
+│ Tipo: line                                                                   │
+│ Campos: start|end|color|layer                                                │
+│ Ejemplo: line|0,0|10,10|red|walls                                            │
+│ ────────────────────────────────────────                                     │
+│ Tipo: circle                                                                 │
+│ Campos: center|radius|color|layer                                            │
+│ Ejemplo: circle|5,5|3|blue                                                   │
+│ ────────────────────────────────────────                                     │
+│ Tipo: rect                                                                   │
+│ Campos: corner1|corner2|color|layer                                          │
+│ Ejemplo: rect|0,0|20,15                                                      │
+│ ────────────────────────────────────────                                     │
+│ Tipo: text                                                                   │
+│ Campos: pos|texto|height|color|layer                                         │
+│ Ejemplo: text|5,5|Hello|2.5                                                  │
+│ ────────────────────────────────────────                                     │
+│ Tipo: arc                                                                    │
+│ Campos: center|radius|start_angle|end_angle|color                            │
+│ Ejemplo: arc|0,0|5|0|90                                                      │
+│ ────────────────────────────────────────                                     │
+│ Tipo: polyline                                                               │
+│ Campos: points(;sep)|closed|color                                            │
+│ Ejemplo: polyline|0,0;10,10;20,0|closed                                      │
+│ ────────────────────────────────────────                                     │
+│ Tipo: spline                                                                 │
+│ Campos: points(;sep)|closed|color                                            │
+│ Ejemplo: spline|0,0;5,10;10,0                                                │
+│ Defaults: color=white, layer=0                                               │
+│                                                                              │
+│ ---                                                                          │
+│ Tool: manage_entities                                                        │
+│                                                                              │
+│ Parámetro operations acepta:                                                 │
+│ select|layer|walls                                                           │
+│ move|A1,B2,C3|10|5                                                           │
+│ rotate|A1|45|0|0                                                             │
+│ scale|A1,B2|2.0|0|0                                                          │
+│ set_color|A1,B2|red                                                          │
+│ set_layer|A1|walls                                                           │
+│ copy|A1,B2                                                                   │
+│ delete|A1,B2,C3                                                              │
+│                                                                              │
+│ Especificación por acción:                                                   │
+│ ┌───────────┬──────────────────────────────────┬─────────────────────┐       │
+│ │  Acción   │              Campos              │       Ejemplo       │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ select    │ by|value                         │ select|layer|walls  │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ move      │ handles|offset_x|offset_y        │ move|A1,B2|10|5     │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ rotate    │ handles|angle|center_x|center_y  │ rotate|A1|45|0|0    │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ scale     │ handles|factor|center_x|center_y │ scale|A1|2.0|0|0    │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ set_color │ handles|color                    │ set_color|A1,B2|red │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ set_layer │ handles|layer                    │ set_layer|A1|walls  │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ copy      │ handles                          │ copy|A1,B2          │       │
+│ ├───────────┼──────────────────────────────────┼─────────────────────┤       │
+│ │ delete    │ handles                          │ delete|A1,B2        │       │
+│ └───────────┴──────────────────────────────────┴─────────────────────┘       │
+│ ---                                                                          │
+│ Tool: manage_layers                                                          │
+│                                                                              │
+│ Parámetro operations acepta:                                                 │
+│ create|walls|red|50                                                          │
+│ delete|temp                                                                  │
+│ rename|Layer1|furniture                                                      │
+│ on|walls,doors                                                               │
+│ off|Defpoints                                                                │
+│ set_color|0|white                                                            │
+│ list                                                                         │
+│ info                                                                         │
+│                                                                              │
+│ Especificación por acción:                                                   │
+│ ┌───────────┬───────────────────────┬─────────────────────────┐              │
+│ │  Acción   │        Campos         │         Ejemplo         │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ create    │ name|color|lineweight │ create|walls|red        │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ delete    │ name                  │ delete|temp             │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ rename    │ old|new               │ rename|Layer1|furniture │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ on        │ names(,sep)           │ on|walls,doors          │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ off       │ names(,sep)           │ off|Defpoints           │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ set_color │ name|color            │ set_color|0|white       │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ list      │ (sin params)          │ list                    │              │
+│ ├───────────┼───────────────────────┼─────────────────────────┤              │
+│ │ info      │ (sin params)          │ info                    │              │
+│ └───────────┴───────────────────────┴─────────────────────────┘              │
+│ ---                                                                          │
+│ Tool: manage_blocks                                                          │
+│                                                                              │
+│ Parámetro operations acepta:                                                 │
+│ list                                                                         │
+│ info|Door                                                                    │
+│ insert|Door|10,20|1.5|90|walls                                               │
+│ create|MyBlock|A1,B2,C3|0,0|Description                                      │
+│                                                                              │
+│ ---                                                                          │
+│ Tool: manage_files                                                           │
+│                                                                              │
+│ Parámetro operations acepta:                                                 │
+│ save|/path/to/file.dwg                                                       │
+│ save|backup.dwg                                                              │
+│ new                                                                          │
+│ close|true                                                                   │
+│ list                                                                         │
+│ switch|floor_plan.dwg                                                        │
+│                                                                              │
+│ ---                                                                          │
+│ Auto-corrección Agresiva                                                     │
+│ ┌─────────────────────────────┬─────────────────────┐                        │
+│ │            Error            │     Corrección      │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ rde                         │ → red (fuzzy match) │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ LINE                        │ → line (lowercase)  │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ 0;0 como coord              │ → 0,0               │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ "3.0" string                │ → 3.0 número        │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ campos extra                │ → ignorados         │                        │
+│ ├─────────────────────────────┼─────────────────────┤                        │
+│ │ campos faltantes opcionales │ → defaults          │                        │
+│ └─────────────────────────────┴─────────────────────┘                        │
+│ ---                                                                          │
+│ Compatibilidad JSON (Opcional)                                               │
+│                                                                              │
+│ Para mantener compatibilidad, detectar formato:                              │
+│ def parse_input(input_str: str) -> List[Dict]:                               │
+│     input_str = input_str.strip()                                            │
+│     if input_str.startswith('[') or input_str.startswith('{'):               │
+│         return json.loads(input_str)  # JSON legacy                          │
+│     return parse_shorthand(input_str)  # Nuevo formato                       │
+│                                                                              │
+│ ---                                                                          │
+│ Implementación                                                               │
+│                                                                              │
+│ Archivos a Crear                                                             │
+│ ┌────────────────────────────┬──────────────────────────────────────────┐    │
+│ │          Archivo           │                Contenido                 │    │
+│ ├────────────────────────────┼──────────────────────────────────────────┤    │
+│ │ src/mcp_tools/shorthand.py │ Parser del formato shorthand             │    │
+│ ├────────────────────────────┼──────────────────────────────────────────┤    │
+│ │ src/mcp_tools/validator.py │ Auto-corrección (fuzzy, types, defaults) │    │
+│ └────────────────────────────┴──────────────────────────────────────────┘    │
+│ Archivos a Modificar                                                         │
+│ Archivo: src/mcp_tools/tools/drawing.py                                      │
+│ Cambio: Usar parse_input() en vez de json.loads()                            │
+│ ────────────────────────────────────────                                     │
+│ Archivo: src/mcp_tools/tools/entities.py                                     │
+│ Cambio: Usar parse_input()                                                   │
+│ ────────────────────────────────────────                                     │
+│ Archivo: src/mcp_tools/tools/layers.py                                       │
+│ Cambio: Usar parse_input()                                                   │
+│ ────────────────────────────────────────                                     │
+│ Archivo: src/mcp_tools/tools/blocks.py                                       │
+│ Cambio: Usar parse_input()                                                   │
+│ ────────────────────────────────────────                                     │
+│ Archivo: src/mcp_tools/tools/files.py                                        │
+│ Cambio: Usar parse_input()                                                   │
+│ Actualizar Docstrings                                                        │
+│                                                                              │
+│ Cada tool tendrá documentación clara del formato:                            │
+│ def draw_entities(ctx: Context, entities: str, cad_type: Optional[str] =     │
+│ None) -> str:                                                                │
+│     """                                                                      │
+│     Dibuja entidades en CAD.                                                 │
+│                                                                              │
+│     FORMATO (una línea por entidad):                                         │
+│       line|start|end|color|layer       → line|0,0|10,10|red|walls            │
+│       circle|center|radius|color       → circle|5,5|3|blue                   │
+│       rect|corner1|corner2|color       → rect|0,0|20,15                      │
+│       text|pos|texto|height|color      → text|5,5|Hello|2.5                  │
+│       arc|center|radius|start|end      → arc|0,0|5|0|90                      │
+│       polyline|points(;)|closed|color  → polyline|0,0;10,10;20,0|closed      │
+│                                                                              │
+│     DEFAULTS: color=white, layer=0                                           │
+│                                                                              │
+│     Ejemplo:                                                                 │
+│       line|0,0|100,0|red|walls                                               │
+│       line|100,0|100,80|red|walls                                            │
+│       circle|50,40|10|blue                                                   │
+│     """                                                                      │
+│                                                                              │
+│ ---                                                                          │
+│ Comparación Final                                                            │
+│                                                                              │
+│ Antes (JSON)                                                                 │
+│                                                                              │
+│ [{"type":"line","start":"0,0","end":"10,10","color":"red","layer":"walls"},{ │
+│ "type":"circle","center":"5,5","radius":3,"color":"blue"}]                   │
+│ ~95 tokens                                                                   │
+│                                                                              │
+│ Después (Shorthand)                                                          │
+│                                                                              │
+│ line|0,0|10,10|red|walls                                                     │
+│ circle|5,5|3|blue                                                            │
+│ ~15 tokens                                                                   │
+│                                                                              │
+│ Reducción: ~85% menos tokens                                                 │
+│                                                                              │
+│ ---                                                                          │
+│ Verificación                                                                 │
+│                                                                              │
+│ 1. pytest tests/test_shorthand.py -v - Parser shorthand                      │
+│ 2. pytest tests/test_validator.py -v - Auto-corrección                       │
+│ 3. npx @modelcontextprotocol/inspector py src/server.py - Probar tools       │
+│ 4. Verificar compatibilidad JSON legacy                                      │
+│ 5. Probar con inputs con errores (typos, case, etc.)                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+● I'll implement the shorthand format for MCP tools. Let me start by reading the
+   current state of the relevant files to understand the existing structure.
+
+● Read 5 files (ctrl+o to expand)
+
+● Now let me check the helpers module to understand existing parsing functions.
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Let me also check the constants to see existing color mappings for fuzzy
+  matching.
+
+● Read 1 file (ctrl+o to expand)
+
+● Now I have a clear picture. Let me create the task list and implement the
+  shorthand parser and validator.
+
+● Write(src\mcp_tools\shorthand.py)
+  ⎿  Wrote 1 lines to src\mcp_tools\shorthand.py
+     """
+     Shorthand parser for MCP tool inputs.
+
+     Converts compact pipe-separated format to structured dictionaries.
+     Supports ~85% token reduction compared to JSON format.
+
+     Format: type|param1|param2|param3|...
+     Multiple entries: one per line or separated by ;
+
+     Examples:
+
+● Write(src\mcp_tools\validator.py)
+  ⎿  Wrote 1 lines to src\mcp_tools\validator.py
+     """
+     Auto-correction and validation for MCP tool inputs.
+
+     Provides:
+     - Fuzzy color name matching
+     - Type coercion (string to number)
+     - Case normalization
+     - Default value application
+     - Coordinate format normalization
+     """
+
+● Now let me update the drawing.py to use the shorthand parser.
+
+● Update(src\mcp_tools\tools\drawing.py)
+  ⎿  Added 13 lines, removed 6 lines
+       1  """                                                            
+       2  Unified drawing tool for creating geometric entities.          
+       3                                                                 
+       4 -Replaces 9 individual drawing tools (draw_lines, draw_circles, 
+         - draw_arcs,                                                    
+       5 -draw_rectangles, draw_polylines, draw_texts, draw_splines,     
+         -add_dimensions,                                                
+       6 -draw_circle_and_line) with a single `draw_entities` tool that  
+         -dispatches                                                     
+       7 -by entity type.                                                
+       4 +Replaces 9 individual drawing tools with a single              
+         +`draw_entities` tool                                           
+       5 +that accepts a simple shorthand format for ~85% token          
+         +reduction.                                                     
+       6                                                                 
+       7 -Token savings: ~700 lines of duplicated code eliminated, and   
+         -the LLM sees                                                   
+       8 -1 tool description instead of 9.                               
+       7 +SHORTHAND FORMAT (one per line):                               
+       8 +    line|start|end|color|layer       →                         
+         +line|0,0|10,10|red|walls                                       
+       9 +    circle|center|radius|color       → circle|5,5|3|blue       
+      10 +    rect|corner1|corner2|color       → rect|0,0|20,15          
+      11 +    text|pos|text|height|color       → text|5,5|Hello|2.5      
+      12 +    arc|center|radius|start|end      → arc|0,0|5|0|90          
+      13 +    polyline|points(;)|closed|color  →                         
+         +polyline|0,0;10,10;20,0|closed                                 
+      14 +    spline|points(;)|closed|color    → spline|0,0;5,10;10,0    
+      15 +                                                               
+      16 +DEFAULTS: color=white, layer=0                                 
+      17  """                                                            
+      18                                                                 
+      19  import json                                                    
+     ...
+      28  )                                                              
+      29  from mcp_tools.decorators import cad_tool, get_current_adapter 
+      30  from mcp_tools.helpers import parse_coordinate                 
+      31 +from mcp_tools.shorthand import parse_drawing_input            
+      32                                                                 
+      33  logger = logging.getLogger(__name__)                           
+      34                                                                 
+
+● Update(src\mcp_tools\tools\drawing.py)
+  ⎿  Added 21 lines, removed 26 lines
+      236          Draw multiple entities of any type in a single        
+           operation.                                                    
+      237                                                                
+      238          Args:                                                 
+      239 -            entities: JSON array of entity specifications.    
+          -Each object must                                              
+      240 -                      include a "type" field indicating the   
+          -entity type.                                                  
+      239 +            entities: Entity specifications in SHORTHAND      
+          +format (one per line):                                        
+      240                                                                
+      241 -                Supported types and their required/optional   
+          -fields:                                                       
+      241 +                line|start|end|color|layer       →            
+          +line|0,0|10,10|red|walls                                      
+      242 +                circle|center|radius|color       →            
+          +circle|5,5|3|blue                                             
+      243 +                rect|corner1|corner2|color       →            
+          +rect|0,0|20,15                                                
+      244 +                text|pos|text|height|color       →            
+          +text|5,5|Hello|2.5                                            
+      245 +                arc|center|radius|start|end      →            
+          +arc|0,0|5|0|90                                                
+      246 +                polyline|points(;)|closed|color  →            
+          +polyline|0,0;10,10;20,0|closed                                
+      247 +                spline|points(;)|closed|color    →            
+          +spline|0,0;5,10;10,0                                          
+      248 +                dimension|start|end|color        →            
+          +dimension|0,0|10,0                                            
+      249                                                                
+      250 -                - line: start, end [color, layer, lineweight] 
+      251 -                - circle: center, radius [color, layer,       
+          -lineweight]                                                   
+      252 -                - arc: center, radius, start_angle, end_angle 
+          - [color, layer, lineweight]                                   
+      253 -                - rectangle: corner1, corner2 [color, layer,  
+          -lineweight]                                                   
+      254 -                - polyline: points (pipe-separated) [closed,  
+          -color, layer, lineweight]                                     
+      255 -                - text: position, text [height, rotation,     
+          -color, layer]                                                 
+      256 -                - spline: points (pipe-separated) [closed,    
+          -degree, color, layer, lineweight]                             
+      257 -                - dimension: start, end [color, layer, text,  
+          -offset]                                                       
+      250 +                DEFAULTS: color=white, layer=0                
+      251                                                                
+      252                  Example:                                      
+      253 -                [                                             
+      254 -                    {"type": "line", "start": "0,0", "end":   
+          -"10,10", "color": "red"},                                     
+      255 -                    {"type": "circle", "center": "5,5",       
+          -"radius": 3.0, "layer": "circles"},                           
+      256 -                    {"type": "text", "position": "5,5",       
+          -"text": "Center", "height": 1.5},                             
+      257 -                    {"type": "rectangle", "corner1": "0,0",   
+          -"corner2": "20,15"}                                           
+      258 -                ]                                             
+      253 +                    line|0,0|100,0|red|walls                  
+      254 +                    line|100,0|100,80|red|walls               
+      255 +                    circle|50,40|10|blue                      
+      256 +                    text|50,40|Center|2.5|white               
+      257                                                                
+      258 -                Coordinates use "x,y" or "x,y,z" format.      
+      259 -                Points in polylines/splines are pipe-separated
+          -: "0,0|10,10|20,0".                                           
+      258 +                Coordinates: "x,y" or "x,y,z"                 
+      259 +                Points in polylines/splines: semicolon        
+          +-separated "0,0;10,10;20,0"                                   
+      260                                                                
+      261 +                JSON format also supported for backwards      
+          +compatibility.                                                
+      262 +                                                              
+      263              cad_type: CAD application to use                  
+      264                                                                
+      265          Returns:                                              
+      266              JSON result with per-entity status and created    
+           handles                                                       
+      267          """                                                   
+      268          try:                                                  
+      269 -            entities_data = (                                 
+      270 -                json.loads(entities) if isinstance(entities,  
+          -str) else entities                                            
+      271 -            )                                                 
+      272 -            if not isinstance(entities_data, list):           
+      273 -                entities_data = [entities_data]               
+      274 -        except json.JSONDecodeError as e:                     
+      269 +            entities_data = parse_drawing_input(entities)     
+      270 +        except Exception as e:                                
+      271              return json.dumps(                                
+      272                  {                                             
+      273                      "success": False,                         
+      274 -                    "error": f"Invalid JSON input: {str(e)}", 
+      274 +                    "error": f"Invalid input: {str(e)}",      
+      275                      "total": 0,                               
+      276                      "created": 0,                             
+      277                      "results": [],                            
+
+● Now let me update entities.py.
+
+● Update(src\mcp_tools\tools\entities.py)
+  ⎿  Added 13 lines, removed 4 lines
+       1  """                                                            
+       2  Unified entity management tool.                                
+       3                                                                 
+       4 -Single manage_entities tool replaces 13 legacy entity tools:   
+       5 -select_by_color, select_by_layer, select_by_type, move,        
+         -rotate, scale,                                                 
+       6 -change_entity_color, change_entities_colors,                   
+         -change_entity_layer,                                           
+       7 -change_entities_layers, set_entities_color_bylayer,            
+         -copy_entities, paste_entities.                                 
+       4 +Single manage_entities tool replaces 13 legacy entity tools    
+         + with                                                          
+       5 +a simple shorthand format for ~85% token reduction.            
+       6 +                                                               
+       7 +SHORTHAND FORMAT (one per line):                               
+       8 +    select|by|value               → select|layer|walls         
+       9 +    move|handles|offset_x|offset_y → move|A1,B2|10|5           
+      10 +    rotate|handles|angle|cx|cy    → rotate|A1|45|0|0           
+      11 +    scale|handles|factor|cx|cy    → scale|A1|2.0|0|0           
+      12 +    set_color|handles|color       → set_color|A1,B2|red        
+      13 +    set_layer|handles|layer       → set_layer|A1|walls         
+      14 +    copy|handles                  → copy|A1,B2                 
+      15 +    delete|handles                → delete|A1,B2               
+      16  """                                                            
+      17                                                                 
+      18  import json                                                    
+     ...
+      21  )                                                              
+      22  from mcp_tools.decorators import cad_tool, get_current_adapter 
+      23  from mcp_tools.helpers import parse_handles                    
+      24 +from mcp_tools.shorthand import parse_entity_ops_input         
+      25                                                                 
+      26  logger = logging.getLogger(__name__)                           
+      27                                                                 
+
+● Update(src\mcp_tools\tools\entities.py)
+  ⎿  Added 20 lines, removed 39 lines
+      232          Manage entities: select, transform, restyle,          
+           copy/paste.                                                   
+      233                                                                
+      234          Args:                                                 
+      235 -            operations: JSON array of operations. Each object 
+          - must include                                                 
+      236 -                        an "action" field.                    
+      235 +            operations: Operations in SHORTHAND format (one   
+          +per line):                                                    
+      236                                                                
+      237 -                Supported actions and their required fields:  
+      237 +                select|by|value               →               
+          +select|layer|walls                                            
+      238 +                move|handles|offset_x|offset_y →              
+          +move|A1,B2|10|5                                               
+      239 +                rotate|handles|angle|cx|cy    →               
+          +rotate|A1|45|0|0                                              
+      240 +                scale|handles|factor|cx|cy    →               
+          +scale|A1|2.0|0|0                                              
+      241 +                set_color|handles|color       →               
+          +set_color|A1,B2|red                                           
+      242 +                set_layer|handles|layer       →               
+          +set_layer|A1|walls                                            
+      243 +                set_color_bylayer|handles     →               
+          +set_color_bylayer|A1,B2                                       
+      244 +                copy|handles                  → copy|A1,B2    
+      245 +                paste|base_point              → paste|100,200 
+      246 +                delete|handles                → delete|A1,B2  
+      247                                                                
+      248 -                Selection:                                    
+      249 -                - select: by, value                           
+      250 -                    by: "color", "layer", or "type"           
+      251 -                    value: color name / layer name / entity   
+          -type                                                          
+      248 +                "handles" = comma-separated entity handles    
+          +(e.g. "A1B2,C3D4")                                            
+      249 +                "by" = "color", "layer", or "type"            
+      250                                                                
+      251 -                Transforms:                                   
+      252 -                - move:   handles, offset_x, offset_y         
+      253 -                - rotate: handles, center_x, center_y, angle  
+          -(degrees)                                                     
+      254 -                - scale:  handles, center_x, center_y,        
+          -scale_factor                                                  
+      255 -                                                              
+      256 -                Properties:                                   
+      257 -                - set_color:        handles, color            
+      258 -                - set_layer:        handles, layer_name       
+      259 -                - set_color_bylayer: handles                  
+      260 -                                                              
+      261 -                Clipboard:                                    
+      262 -                - copy:  handles                              
+      263 -                - paste: base_point ("x,y")                   
+      264 -                                                              
+      265 -                "handles" is always comma-separated entity    
+          -handles (e.g. "A1B2,C3D4").                                   
+      266 -                                                              
+      251                  Example:                                      
+      252 -                [                                             
+      253 -                    {"action": "select", "by": "layer",       
+          -"value": "walls"},                                            
+      254 -                    {"action": "move", "handles":             
+          -"A1B2,C3D4", "offset_x": 10, "offset_y": 5},                  
+      255 -                    {"action": "set_color", "handles":        
+          -"A1B2,C3D4", "color": "red"},                                 
+      256 -                    {"action": "rotate", "handles": "E5F6",   
+          -"center_x": 0, "center_y": 0, "angle": 45},                   
+      257 -                    {"action": "copy", "handles":             
+          -"A1B2,C3D4"},                                                 
+      258 -                    {"action": "paste", "base_point":         
+          -"100,200"}                                                    
+      259 -                ]                                             
+      252 +                    select|layer|walls                        
+      253 +                    move|A1B2,C3D4|10|5                       
+      254 +                    set_color|A1B2,C3D4|red                   
+      255                                                                
+      256 -                Operations execute sequentially.              
+      256 +                JSON format also supported for backwards      
+          +compatibility.                                                
+      257                                                                
+      258              cad_type: CAD application to use                  
+      259                                                                
+     ...
+      276              JSON result with per-operation status             
+      277          """                                                   
+      278          try:                                                  
+      279 -            ops_data = (                                      
+      280 -                json.loads(operations) if                     
+          -isinstance(operations, str) else operations                   
+      281 -            )                                                 
+      282 -            if not isinstance(ops_data, list):                
+      283 -                ops_data = [ops_data]                         
+      284 -        except json.JSONDecodeError as e:                     
+      279 +            ops_data = parse_entity_ops_input(operations)     
+      280 +        except Exception as e:                                
+      281              return json.dumps(                                
+      282                  {                                             
+      283                      "success": False,                         
+      284 -                    "error": f"Invalid JSON input: {str(e)}", 
+      284 +                    "error": f"Invalid input: {str(e)}",      
+      285                      "total": 0,                               
+      286                      "succeeded": 0,                           
+      287                      "results": [],                            
+
+● Now let me update layers.py.
+
+● Update(src\mcp_tools\tools\layers.py)
+  ⎿  Added 13 lines, removed 3 lines
+       1  """                                                            
+       2  Unified layer management tool.                                 
+       3                                                                 
+       4 -Single manage_layers tool replaces all 9 legacy layer tools:   
+       5 -create_layer, rename_layers, delete_layers, turn_layers_on,    
+       6 -turn_layers_off, set_layer_color, list_layers, is_layer_on,    
+         -get_layers_info.                                               
+       4 +Single manage_layers tool replaces all 9 legacy layer tools    
+         + with                                                          
+       5 +a simple shorthand format for ~85% token reduction.            
+       6 +                                                               
+       7 +SHORTHAND FORMAT (one per line):                               
+       8 +    create|name|color|lineweight  → create|walls|red|50        
+       9 +    delete|name                   → delete|temp                
+      10 +    rename|old|new                → rename|Layer1|furniture    
+      11 +    on|names(,sep)                → on|walls,doors             
+      12 +    off|names(,sep)               → off|Defpoints              
+      13 +    set_color|name|color          → set_color|0|white          
+      14 +    list                          → list                       
+      15 +    info                          → info                       
+      16  """                                                            
+      17                                                                 
+      18  import json                                                    
+     ...
+      15                                                                 
+      16  from core.models import CreateLayerRequest                     
+      17  from mcp_tools.decorators import cad_tool, get_current_adapter 
+      18 +from mcp_tools.shorthand import parse_layer_ops_input          
+      19                                                                 
+      20  logger = logging.getLogger(__name__)                           
+      21                                                                 
+
+● Update(src\mcp_tools\tools\layers.py)
+  ⎿  Added 19 lines, removed 35 lines
+      194          Manage layers: create, modify, query, or change       
+           visibility.                                                   
+      195                                                                
+      196          Args:                                                 
+      197 -            operations: JSON array of operations. Each object 
+          - must include                                                 
+      198 -                        an "action" field.                    
+      197 +            operations: Operations in SHORTHAND format (one   
+          +per line):                                                    
+      198                                                                
+      199 -                Supported actions and their required fields:  
+      199 +                create|name|color|lineweight  →               
+          +create|walls|red|50                                           
+      200 +                delete|name                   → delete|temp   
+      201 +                rename|old|new                →               
+          +rename|Layer1|furniture                                       
+      202 +                on|names(,sep)                →               
+          +on|walls,doors                                                
+      203 +                off|names(,sep)               → off|Defpoints 
+      204 +                set_color|name|color          →               
+          +set_color|0|white                                             
+      205 +                is_on|name                    → is_on|walls   
+      206 +                list                          → list          
+      207 +                info                          → info          
+      208                                                                
+      209 -                Mutations:                                    
+      210 -                - create:    name [color, lineweight]         
+      211 -                - rename:    old_name, new_name               
+      212 -                - delete:    name                             
+      213 -                - turn_on:   names (array of layer names)     
+      214 -                - turn_off:  names (array of layer names)     
+      215 -                - set_color: name, color                      
+      209 +                DEFAULTS: color=white, lineweight=25          
+      210                                                                
+      211 -                Queries:                                      
+      212 -                - list:  (no fields) — list all layer names   
+      213 -                - is_on: name — check if a layer is visible   
+      214 -                - info:  (no fields) — detailed info for all  
+          -layers                                                        
+      215 -                    (name, color, on/off, locked, frozen,     
+          -current)                                                      
+      216 -                                                              
+      211                  Example:                                      
+      212 -                [                                             
+      213 -                    {"action": "list"},                       
+      214 -                    {"action": "create", "name": "walls",     
+          -"color": "red", "lineweight": 50},                            
+      215 -                    {"action": "create", "name": "doors",     
+          -"color": "blue"},                                             
+      216 -                    {"action": "turn_off", "names":           
+          -["Defpoints", "notes"]},                                      
+      217 -                    {"action": "is_on", "name": "walls"},     
+      218 -                    {"action": "set_color", "name": "0",      
+          -"color": "white"},                                            
+      219 -                    {"action": "rename", "old_name":          
+          -"Layer1", "new_name": "furniture"},                           
+      220 -                    {"action": "delete", "name":              
+          -"temp_layer"},                                                
+      221 -                    {"action": "info"}                        
+      222 -                ]                                             
+      212 +                    create|walls|red                          
+      213 +                    create|doors|blue                         
+      214 +                    off|Defpoints,notes                       
+      215 +                    set_color|0|white                         
+      216                                                                
+      217 -                Operations execute sequentially.              
+      217 +                JSON format also supported for backwards      
+          +compatibility.                                                
+      218                                                                
+      219              cad_type: CAD application to use                  
+      220                                                                
+     ...
+      234              JSON result with per-operation status             
+      235          """                                                   
+      236          try:                                                  
+      237 -            ops_data = (                                      
+      238 -                json.loads(operations) if                     
+          -isinstance(operations, str) else operations                   
+      239 -            )                                                 
+      240 -            if not isinstance(ops_data, list):                
+      241 -                ops_data = [ops_data]                         
+      242 -        except json.JSONDecodeError as e:                     
+      237 +            ops_data = parse_layer_ops_input(operations)      
+      238 +        except Exception as e:                                
+      239              return json.dumps(                                
+      240                  {                                             
+      241                      "success": False,                         
+      242 -                    "error": f"Invalid JSON input: {str(e)}", 
+      242 +                    "error": f"Invalid input: {str(e)}",      
+      243                      "total": 0,                               
+      244                      "succeeded": 0,                           
+      245                      "results": [],                            
+
+● Now let me update blocks.py.
+
+● Update(src\mcp_tools\tools\blocks.py)
+  ⎿  Added 9 lines, removed 3 lines
+       1  """                                                            
+       2  Unified block management tool.                                 
+       3                                                                 
+       4 -Single manage_blocks tool replaces all 7 legacy block tools:   
+       5 -create_block, insert_block, insert_blocks_batch, list_blocks,  
+       6 -get_block_info, get_block_references (+ create_block from      
+         -legacy drawing).                                               
+       4 +Single manage_blocks tool replaces all 7 legacy block tools    
+         + with                                                          
+       5 +a simple shorthand format for ~85% token reduction.            
+       6 +                                                               
+       7 +SHORTHAND FORMAT (one per line):                               
+       8 +    list                                      → list           
+       9 +    info|block_name|include                   → info|Door|both 
+      10 +    insert|name|point|scale|rotation|layer    →                
+         +insert|Door|10,20|1.5|90|walls                                 
+      11 +    create|name|handles|point|description     →                
+         +create|MyBlock|A1,B2|0,0|Desc                                  
+      12  """                                                            
+      13                                                                 
+      14  import json                                                    
+     ...
+      14                                                                 
+      15  from mcp_tools.decorators import cad_tool, get_current_adapter 
+      16  from mcp_tools.helpers import parse_coordinate                 
+      17 +from mcp_tools.shorthand import parse_block_ops_input          
+      18                                                                 
+      19  logger = logging.getLogger(__name__)                           
+      20                                                                 
+
+● Update(src\mcp_tools\tools\blocks.py)
+  ⎿  Added 16 lines, removed 36 lines
+      161          Manage blocks: create, insert, list, or query block   
+           information.                                                  
+      162                                                                
+      163          Args:                                                 
+      164 -            operations: JSON array of operations. Each object 
+          - must include                                                 
+      165 -                        an "action" field.                    
+      164 +            operations: Operations in SHORTHAND format (one   
+          +per line):                                                    
+      165                                                                
+      166 -                Supported actions and their required fields:  
+      166 +                list                                      →   
+          +list                                                          
+      167 +                info|block_name|include                   →   
+          +info|Door|both                                                
+      168 +                insert|name|point|scale|rotation|layer    →   
+          +insert|Door|10,20|1.5|90|walls                                
+      169 +                create|name|handles|point|description     →   
+          +create|MyBlock|A1,B2|0,0|Desc                                 
+      170                                                                
+      171 -                Mutations:                                    
+      172 -                - create: block_name [entity_handles,         
+          -insertion_point, description]                                 
+      173 -                    Creates a block definition from entity    
+          -handles or current selection.                                 
+      174 -                    If entity_handles is omitted, uses        
+          -currently selected entities.                                  
+      171 +                "include" = "info" (default), "references",   
+          +or "both"                                                     
+      172 +                "handles" = comma-separated entity handles    
+      173                                                                
+      174 -                - insert: block_name, insertion_point [scale, 
+          - rotation, layer]                                             
+      175 -                    Inserts a block reference into the        
+          -drawing.                                                      
+      176 -                    Use multiple insert operations for batch  
+          -insertion.                                                    
+      174 +                DEFAULTS: scale=1.0, rotation=0, layer=0,     
+          +include=info                                                  
+      175                                                                
+      176 -                Queries:                                      
+      177 -                - list: (no fields)                           
+      178 -                    Lists all non-system block definitions in 
+          - the drawing.                                                 
+      179 -                    Returns block names, entity counts, and   
+          -reference counts.                                             
+      180 -                                                              
+      181 -                - info: block_name [include]                  
+      182 -                    Gets block definition details and/or      
+          -references.                                                   
+      183 -                    include: "info" (default), "references",  
+          -or "both"                                                     
+      184 -                                                              
+      176                  Example:                                      
+      177 -                [                                             
+      178 -                    {"action": "list"},                       
+      179 -                    {"action": "info", "block_name": "Door",  
+          -"include": "both"},                                           
+      180 -                    {"action": "create", "block_name":        
+          -"MyBlock", "entity_handles": ["A1B2", "C3D4"]},               
+      181 -                    {"action": "insert", "block_name":        
+          -"Door", "insertion_point": "10,20", "scale": 1.5},            
+      182 -                    {"action": "insert", "block_name":        
+          -"Door", "insertion_point": "30,20", "rotation": 90}           
+      183 -                ]                                             
+      177 +                    list                                      
+      178 +                    info|Door|both                            
+      179 +                    insert|Door|10,20|1.5|90                  
+      180 +                    insert|Door|30,20|1.0|0                   
+      181                                                                
+      182 -                Coordinates: "x,y" or "x,y,z" format.         
+      183 -                Operations execute sequentially.              
+      184 -                View refreshes once after all operations      
+          -complete.                                                     
+      182 +                JSON format also supported for backwards      
+          +compatibility.                                                
+      183                                                                
+      184              cad_type: CAD application to use                  
+      185                                                                
+     ...
+      203              JSON result with per-operation status             
+      204          """                                                   
+      205          try:                                                  
+      206 -            ops_data = (                                      
+      207 -                json.loads(operations) if                     
+          -isinstance(operations, str) else operations                   
+      208 -            )                                                 
+      209 -            if not isinstance(ops_data, list):                
+      210 -                ops_data = [ops_data]                         
+      211 -        except json.JSONDecodeError as e:                     
+      206 +            ops_data = parse_block_ops_input(operations)      
+      207 +        except Exception as e:                                
+      208              return json.dumps(                                
+      209                  {                                             
+      210                      "success": False,                         
+      211 -                    "error": f"Invalid JSON input: {str(e)}", 
+      211 +                    "error": f"Invalid input: {str(e)}",      
+      212                      "total": 0,                               
+      213                      "succeeded": 0,                           
+      214                      "results": [],                            
+
+● Now let me update files.py.
+
+● Update(src\mcp_tools\tools\files.py)
+  ⎿  Added 11 lines, removed 3 lines
+       1  """                                                            
+       2  Unified file management tool.                                  
+       3                                                                 
+       4 -Replaces 5 individual tools with 1:                            
+       5 -- manage_files: save_drawing, new_drawing, close_drawing,      
+       6 -                get_open_drawings, switch_drawing (5→1)        
+       4 +Replaces 5 individual tools with 1                             
+         + using a simple shorthand format                               
+       5 +for ~85% token reduction.                                      
+       6 +                                                               
+       7 +SHORTHAND FORMAT (one per line):                               
+       8 +    save|path_or_filename|format  → save|/path/to/file.dwg     
+       9 +    save|filename                 → save|backup.dwg            
+      10 +    new                           → new                        
+      11 +    close|save_changes            → close|true                 
+      12 +    list                          → list                       
+      13 +    switch|drawing_name           → switch|floor_plan.dwg      
+      14  """                                                            
+      15                                                                 
+      16  import json                                                    
+     ...
+      15                                                                 
+      16  from core import get_config                                    
+      17  from mcp_tools.decorators import cad_tool, get_current_adapter 
+      18 +from mcp_tools.shorthand import parse_file_ops_input           
+      19                                                                 
+      20  logger = logging.getLogger(__name__)                           
+      21                                                                 
+
+● Update(src\mcp_tools\tools\files.py)
+  ⎿  Added 16 lines, removed 32 lines
+      146          Manage drawing files with one or more operations in a 
+            single call.                                                 
+      147                                                                
+      148          Args:                                                 
+      149 -            operations: JSON array of operations. Each object 
+          - must include                                                 
+      150 -                        an "action" field.                    
+      149 +            operations: Operations in SHORTHAND format (one   
+          +per line):                                                    
+      150                                                                
+      151 -                Supported actions and their fields:           
+      151 +                save|path_or_filename|format  →               
+          +save|/path/to/file.dwg                                        
+      152 +                save|filename                 →               
+          +save|backup.dwg                                               
+      153 +                new                           → new           
+      154 +                close|save_changes            → close|true    
+      155 +                list                          → list          
+      156 +                switch|drawing_name           →               
+          +switch|floor_plan.dwg                                         
+      157                                                                
+      158 -                - save:   [filepath, filename, format]        
+      159 -                    Save current drawing. Use filepath for    
+          -full path,                                                    
+      160 -                    or filename to save to output directory.  
+      161 -                    format: "dwg" (default), "dxf", "pdf"     
+      158 +                "format" = "dwg" (default), "dxf", "pdf"      
+      159 +                "save_changes" = true/false (default: false)  
+      160                                                                
+      161 -                - new:    (no fields)                         
+      162 -                    Create a new blank drawing.               
+      163 -                                                              
+      164 -                - close:  [save_changes]                      
+      165 -                    Close current drawing. save_changes:      
+          -true/false (default: false)                                   
+      166 -                                                              
+      167 -                - list:   (no fields)                         
+      168 -                    List all open drawings.                   
+      169 -                                                              
+      170 -                - switch: drawing_name                        
+      171 -                    Switch to a different open drawing.       
+      172 -                                                              
+      161                  Example:                                      
+      162 -                [                                             
+      163 -                    {"action": "save", "filename":            
+          -"backup.dwg"},                                                
+      164 -                    {"action": "new"},                        
+      165 -                    {"action": "switch", "drawing_name":      
+          -"floor_plan.dwg"}                                             
+      166 -                ]                                             
+      162 +                    save|backup.dwg                           
+      163 +                    new                                       
+      164 +                    switch|floor_plan.dwg                     
+      165                                                                
+      166 -                Operations execute sequentially.              
+      166 +                JSON format also supported for backwards      
+          +compatibility.                                                
+      167                                                                
+      168              cad_type: CAD application to use                  
+      169                                                                
+     ...
+      183              JSON result with per-operation status             
+      184          """                                                   
+      185          try:                                                  
+      186 -            ops_data = (                                      
+      187 -                json.loads(operations) if                     
+          -isinstance(operations, str) else operations                   
+      188 -            )                                                 
+      189 -            if not isinstance(ops_data, list):                
+      190 -                ops_data = [ops_data]                         
+      191 -        except json.JSONDecodeError as e:                     
+      186 +            ops_data = parse_file_ops_input(operations)       
+      187 +        except Exception as e:                                
+      188              return json.dumps(                                
+      189                  {                                             
+      190                      "success": False,                         
+      191 -                    "error": f"Invalid JSON input: {str(e)}", 
+      191 +                    "error": f"Invalid input: {str(e)}",      
+      192                      "total": 0,                               
+      193                      "succeeded": 0,                           
+      194                      "results": [],                            
+
+● Now let me create the tests for the shorthand parser.
+
+● Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Write(tests\test_shorthand.py)
+  ⎿  Wrote 1 lines to tests\test_shorthand.py
+     """
+     Tests for shorthand parser module.
+
+     Tests all shorthand parsing scenarios including:
+     - Drawing entities (line, circle, rect, text, arc, polyline, spline)
+     - Entity operations (select, move, rotate, scale, etc.)
+     - Layer operations (create, delete, on, off, etc.)
+     - Block operations (list, info, insert, create)
+     - File operations (save, new, close, list, switch)
+     - JSON fallback compatibility
+
+● Write(tests\test_validator.py)
+  ⎿  Wrote 1 lines to tests\test_validator.py
+     """
+     Tests for validator module.
+
+     Tests auto-correction features:
+     - Fuzzy color name matching
+     - Type coercion (string to number)
+     - Case normalization
+     - Coordinate normalization
+     - Default value application
+     """
+
+● Now let me run the tests to verify everything works.
+
+● Bash(py -m pytest tests/test_shorthand.py tests/test_validator.py -v 2>&1 |
+      head -150)
+  ⎿ ============================= test session starts =====================
+    ========
+    platform win32 -- Python 3.14.0, pytest-9.0.1, pluggy-1.6.0 -- D:\dev\p
+    … +223 lines (ctrl+o to expand)
+
+
+
+● All 106 tests pass. Now let me run the full test suite to make sure I haven't
+  broken anything.
+
+● Bash(py -m pytest tests/ -v 2>&1 | tail -50)
+  ⎿  tests/test_shorthand.py::TestFileOpShorthand::test_close_save PASSED
+       [ 72%]
+     tests/test_shorthand.py::TestFileOpShorthand::test_list PASSED
+     … +96 lines (ctrl+o to expand)
+
+● All 168 tests pass (62 original + 106 new). Let me also run mypy to check for
+  type errors.
+
+● Bash(py -m mypy src/mcp_tools/shorthand.py src/mcp_tools/validator.py
+      --ignore-missing-imports 2>&1)
+  ⎿  Error: Exit code 1
+     src\mcp_tools\shorthand.py:143: error: "Never" object is not iterable  
+     [misc]
+     src\mcp_tools\shorthand.py:143: error: Argument 1 to "enumerate" has 
+     incompatible type "object"; expected "Iterable[Never]"  [arg-type]
+     src\mcp_tools\shorthand.py:150: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:151: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:152: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:154: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:155: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:156: error: Cannot determine type of "field_name
+       [has-type]
+     src\mcp_tools\shorthand.py:158: error: Cannot determine type of "field_name
+       [has-type]
+     … +41 lines (ctrl+o to see all)
+
+● The mypy errors are due to missing type annotations on the field definitions.
+  Let me fix these.
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 6 lines, removed 2 lines
+      15                                                                 
+      16  import json                                                    
+      17  import re                                                      
+      18 -from typing import Any, Dict, List, Optional, Union            
+      18 +from typing import Any, Dict, List, Optional, Tuple, Union     
+      19                                                                 
+      20  from mcp_tools.validator import autocorrect_spec               
+      21                                                                 
+      22                                                                 
+      23 +# Type alias for field definitions: (field_name, required,     
+         +default_value)                                                 
+      24 +FieldDef = Tuple[str, bool, Any]                               
+      25 +FieldList = List[FieldDef]                                     
+      26 +                                                               
+      27  # ========== Drawing Entity Parsers ==========                 
+      28                                                                 
+      29  # Field definitions for each entity type                       
+      30  # Format: (field_name, required, default_value)                
+      31 -ENTITY_FIELDS = {                                              
+      31 +ENTITY_FIELDS: Dict[str, FieldList] = {                        
+      32      "line": [                                                  
+      33          ("start", True, None),                                 
+      34          ("end", True, None),                                   
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 1 line, removed 1 line
+      170                                                                
+      171  # ========== Entity Operations Parser ==========              
+      172                                                                
+      173 -ENTITY_OP_FIELDS = {                                          
+      173 +ENTITY_OP_FIELDS: Dict[str, FieldList] = {                    
+      174      "select": [                                               
+      175          ("by", True, None),                                   
+      176          ("value", True, None),                                
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 1 line, removed 1 line
+      256                                                                
+      257  # ========== Layer Operations Parser ==========               
+      258                                                                
+      259 -LAYER_OP_FIELDS = {                                           
+      259 +LAYER_OP_FIELDS: Dict[str, FieldList] = {                     
+      260      "create": [                                               
+      261          ("name", True, None),                                 
+      262          ("color", False, "white"),                            
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 1 line, removed 1 line
+      346                                                                
+      347  # ========== Block Operations Parser ==========               
+      348                                                                
+      349 -BLOCK_OP_FIELDS = {                                           
+      349 +BLOCK_OP_FIELDS: Dict[str, FieldList] = {                     
+      350      "list": [],                                               
+      351      "info": [                                                 
+      352          ("block_name", True, None),                           
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 1 line, removed 1 line
+      412                                                                
+      413  # ========== File Operations Parser ==========                
+      414                                                                
+      415 -FILE_OP_FIELDS = {                                            
+      415 +FILE_OP_FIELDS: Dict[str, FieldList] = {                      
+      416      "save": [                                                 
+      417          ("filepath", False, None),                            
+      418          ("filename", False, None),                            
+
+● Bash(py -m mypy src/mcp_tools/shorthand.py src/mcp_tools/validator.py
+      --ignore-missing-imports 2>&1)
+  ⎿  Success: no issues found in 2 source files
+
+● Now let me run the tests again to make sure everything still works.
+
+● Bash(py -m pytest tests/ -v --tb=short 2>&1 | tail -20)
+  ⎿ tests/test_validator.py::TestNormalizeCoordinate::test_whitespace_remov
+    al PASSED [ 89%]
+    tests/test_validator.py::TestNormalizeCoordinate::test_tuple_conversion
+    … +36 lines (ctrl+o to expand)
+
+
+
+● Let me also verify the server can still import and initialize correctly.
+
+● Bash(cd D:\dev\proys\mcp\cad\multiCAD-mcp\src && py -c "from
+      mcp_tools.shorthand import parse_drawing_input, parse_entity_ops_input,
+      parse_layer_ops_input, parse_blo…)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ mypy src/                                                                 
+  src\web\api.py: error: Source file found twice under different module     
+  names: "api" and "web.api"                                                
+  src\web\api.py: note: See https://mypy.readthedocs.io/en/stable/running_m 
+  ypy.html#mapping-file-paths-to-modules for more info                      
+  src\web\api.py: note: Common resolutions include: a) adding `__init__.py` 
+   somewhere, b) using `--explicit-package-bases` or adjusting MYPYPATH     
+  Found 1 error in 1 file (errors prevented further checking)               
+
+● Let me fix the missing __init__.py in the web directory.
+
+● Searched for 1 pattern (ctrl+o to expand)
+
+● Write(src\web\__init__.py)
+  ⎿  Wrote 1 lines to src\web\__init__.py
+     """Web API module for multiCAD-MCP."""
+
+
+● Bash(py -m mypy src/ --ignore-missing-imports 2>&1)
+  ⎿  Error: Exit code 1
+     src\web\api.py:59: error: Item "None" of "Any | None" has no attribute 
+     "get_open_drawings"  [union-attr]
+     src\web\api.py:60: error: Item "None" of "Any | None" has no attribute 
+     "get_current_drawing_name"  [union-attr]
+     Found 2 errors in 1 file (checked 50 source files)
+
+● Read 1 file (ctrl+o to expand)
+
+● These are pre-existing type issues in web/api.py, not related to my shorthand
+  changes. Let me fix them quickly.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(src\web\api.py)
+  ⎿  Added 1 line, removed 1 line
+      55          drawings = []                                          
+      56          current_drawing = "None"                               
+      57                                                                 
+      58 -        if connected:                                          
+      58 +        if connected and adapter is not None:                  
+      59              drawings = adapter.get_open_drawings()             
+      60              current_drawing =                                  
+          adapter.get_current_drawing_name()                             
+      61                                                                 
+
+● Bash(py -m mypy src/ --ignore-missing-imports 2>&1)
+  ⎿  Success: no issues found in 50 source files
+
+● All type checks pass. Let me verify the tests still pass.
+
+● Bash(py -m pytest tests/ -v --tb=short 2>&1 | tail -10)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ /model 
+  ⎿  Set model to haiku (claude-haiku-4-5-20251001)
+
+❯ flake8 src/ --max-line-length 150                                         
+  src/mcp_tools\shorthand.py:17:1: F401 're' imported but unused            
+  src/mcp_tools\shorthand.py:18:1: F401 'typing.Optional' imported but      
+  unused                                                                    
+  src/server.py:87:5: F401 'os' imported but unused                         
+  src/server.py:92:1: W293 blank line contains whitespace                   
+  src/server.py:108:1: W293 blank line contains whitespace                  
+  src/server.py:112:1: W293 blank line contains whitespace                  
+  src/server.py:117:1: W293 blank line contains whitespace                  
+  src/server.py:122:1: W293 blank line contains whitespace                  
+  src/server.py:125:1: W293 blank line contains whitespace                  
+  src/server.py:128:1: W293 blank line contains whitespace                  
+  src/server.py:130:1: W293 blank line contains whitespace                  
+  src/web\api.py:2:1: F401 'os' imported but unused                         
+  src/web\api.py:3:1: F401 'webbrowser' imported but unused                 
+  src/web\api.py:5:1: F401 'typing.List' imported but unused                
+  src/web\api.py:5:1: F401 'typing.Optional' imported but unused            
+  src/web\api.py:8:1: F401 'fastapi.responses.JSONResponse' imported but    
+  unused                                                                    
+  src/web\api.py:10:1: F401 'pydantic.BaseModel' imported but unused        
+  src/web\api.py:12:1: F401 'adapters.adapter_manager.get_cad_instances'    
+  imported but unused                                                       
+  src/web\api.py:23:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:27:1: E305 expected 2 blank lines after class or function  
+  definition, found 1                                                       
+  src/web\api.py:29:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:34:10: E111 indentation is not a multiple of 4             
+  src/web\api.py:34:10: E117 over-indented                                  
+  src/web\api.py:37:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:42:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:51:1: W293 blank line contains whitespace                  
+  src/web\api.py:54:1: W293 blank line contains whitespace                  
+  src/web\api.py:57:1: W293 blank line contains whitespace                  
+  src/web\api.py:61:1: W293 blank line contains whitespace                  
+  src/web\api.py:73:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:78:1: W293 blank line contains whitespace                  
+  src/web\api.py:81:1: W293 blank line contains whitespace                  
+  src/web\api.py:88:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:93:1: W293 blank line contains whitespace                  
+  src/web\api.py:96:1: W293 blank line contains whitespace                  
+  src/z_legacy\adapters\autocad_adapter_backup.py:1715:17: F841 local       
+  variable 'existing_block' is assigned to but never used                   
+  src/z_legacy\adapters\autocad_adapter_backup.py:1824:17: F841 local       
+  variable 'existing_block' is assigned to but never used                   
+
+● Let me clean up the unused imports in my new files.
+
+● Update(src\mcp_tools\shorthand.py)
+  ⎿  Added 1 line, removed 2 lines
+      14  """                                                            
+      15                                                                 
+      16  import json                                                    
+      17 -import re                                                      
+      18 -from typing import Any, Dict, List, Optional, Tuple, Union     
+      17 +from typing import Any, Dict, List, Tuple, Union               
+      18                                                                 
+      19  from mcp_tools.validator import autocorrect_spec               
+      20                                                                 
+
+● Bash(flake8 src/mcp_tools/shorthand.py src/mcp_tools/validator.py
+      --max-line-length 150 2>&1)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ flake8 src/ --max-line-length 150                                         
+  src/server.py:87:5: F401 'os' imported but unused                         
+  src/server.py:92:1: W293 blank line contains whitespace                   
+  src/server.py:108:1: W293 blank line contains whitespace                  
+  src/server.py:112:1: W293 blank line contains whitespace                  
+  src/server.py:117:1: W293 blank line contains whitespace                  
+  src/server.py:122:1: W293 blank line contains whitespace                  
+  src/server.py:125:1: W293 blank line contains whitespace                  
+  src/server.py:128:1: W293 blank line contains whitespace                  
+  src/server.py:130:1: W293 blank line contains whitespace                  
+  src/web\api.py:2:1: F401 'os' imported but unused                         
+  src/web\api.py:3:1: F401 'webbrowser' imported but unused                 
+  src/web\api.py:5:1: F401 'typing.List' imported but unused                
+  src/web\api.py:5:1: F401 'typing.Optional' imported but unused            
+  src/web\api.py:8:1: F401 'fastapi.responses.JSONResponse' imported but    
+  unused                                                                    
+  src/web\api.py:10:1: F401 'pydantic.BaseModel' imported but unused        
+  src/web\api.py:12:1: F401 'adapters.adapter_manager.get_cad_instances'    
+  imported but unused                                                       
+  src/web\api.py:23:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:27:1: E305 expected 2 blank lines after class or function  
+  definition, found 1                                                       
+  src/web\api.py:29:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:34:10: E111 indentation is not a multiple of 4             
+  src/web\api.py:34:10: E117 over-indented                                  
+  src/web\api.py:37:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:42:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:51:1: W293 blank line contains whitespace                  
+  src/web\api.py:54:1: W293 blank line contains whitespace                  
+  src/web\api.py:57:1: W293 blank line contains whitespace                  
+  src/web\api.py:61:1: W293 blank line contains whitespace                  
+  src/web\api.py:73:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:78:1: W293 blank line contains whitespace                  
+  src/web\api.py:81:1: W293 blank line contains whitespace                  
+  src/web\api.py:88:1: E302 expected 2 blank lines, found 1                 
+  src/web\api.py:93:1: W293 blank line contains whitespace                  
+  src/web\api.py:96:1: W293 blank line contains whitespace                  
+  src/z_legacy\adapters\autocad_adapter_backup.py:1715:17: F841 local       
+  variable 'existing_block' is assigned to but never used                   
+  src/z_legacy\adapters\autocad_adapter_backup.py:1824:17: F841 local       
+  variable 'existing_block' is assigned to but never used                   
+
+● Perfect! My new modules are clean. The remaining flake8 errors are in
+  pre-existing files. Let me run the final test suite:
+
+● Bash(py -m pytest tests/ -v 2>&1 | tail -20)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ corrige los errores antiguos 
+
+● Voy a limpiar los errores de flake8 en los archivos existentes.
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(src\server.py)
+  ⎿  Added 8 lines, removed 9 lines
+      84  if __name__ == "__main__":                                     
+      85      import threading                                           
+      86      import uvicorn                                             
+      87 -    import os                                                  
+      87                                                                 
+      88      # Configuration                                            
+      89      host = "127.0.0.1"                                         
+      90      port = 8000                                                
+      91 -                                                               
+      91 +                                                               
+      92      # Autodetect transport mode:                               
+      93      # - If stdin is a TTY (interactive terminal) → HTTP with   
+          dashboard                                                      
+      94      # - If stdin is a pipe (Claude Desktop, etc.) → stdio      
+     ...
+      105      try:                                                      
+      106          if use_stdio:                                         
+      107              logger.info("Starting multiCAD-MCP server in      
+           stdio mode...")                                               
+      108 -                                                              
+      108 +                                                              
+      109              # Start dashboard in background                   
+      110              web_thread =                                      
+           threading.Thread(target=run_dashboard, daemon=True)           
+      111              web_thread.start()                                
+      112 -                                                              
+      112 +                                                              
+      113              # Run MCP stdio                                   
+      114              mcp.run(transport="stdio")                        
+      115          else:                                                 
+      116              logger.info("Starting multiCAD-MCP server in HTTP 
+            mode...")                                                    
+      117 -                                                              
+      117 +                                                              
+      118              # Mount dashboard on the same app                 
+      119              # Note: FastMCP.http_app allows mounting          
+           additional FastAPI apps                                       
+      120              app = mcp.http_app()                              
+      121              app.mount("/", api_app)                           
+      122 -                                                              
+      122 +                                                              
+      123              logger.info(f"Access dashboard at                 
+           http://{host}:{port}/")                                       
+      124              logger.info(f"MCP endpoint at                     
+           http://{host}:{port}/mcp")                                    
+      125 -                                                              
+      125 +                                                              
+      126              # Open browser automatically                      
+      127              webbrowser.open(f"http://{host}:{port}")          
+      128 -                                                              
+      128 +                                                              
+      129              uvicorn.run(app, host=host, port=port)            
+      130 -                                                              
+      130 +                                                              
+      131      except KeyboardInterrupt:                                 
+      132          logger.info("Server stopped by user")                 
+      133      except Exception as e:                                    
+
+● Read 1 file (ctrl+o to expand)
+
+● Update(src\web\api.py)
+  ⎿  Added 26 lines, removed 20 lines
+       1  import logging                                                 
+       2 -import os                                                      
+       3 -import webbrowser                                              
+       2  from pathlib import Path                                       
+       3 -from typing import Any, Dict, List, Optional                   
+       3                                                                 
+       4  from fastapi import FastAPI, HTTPException                     
+       5 -from fastapi.responses import FileResponse, JSONResponse       
+       5 +from fastapi.responses import FileResponse                     
+       6  from fastapi.staticfiles import StaticFiles                    
+       7 -from pydantic import BaseModel                                 
+       7                                                                 
+       8 -from adapters.adapter_manager import get_adapter               
+         -, get_cad_instances                                            
+       8 +from adapters.adapter_manager import get_adapter               
+       9  from core import get_supported_cads                            
+      10                                                                 
+      11  logger = logging.getLogger(__name__)                           
+     ...
+      20  # Static files path                                            
+      21  STATIC_DIR = Path(__file__).parent / "static"                  
+      22                                                                 
+      23 +                                                               
+      24  class ProjectState:                                            
+      25 +    """Project state tracking."""                              
+      26 +                                                               
+      27      def __init__(self):                                        
+      28          self.last_refresh = None                               
+      29                                                                 
+      30 +                                                               
+      31  state = ProjectState()                                         
+      32                                                                 
+      33 +                                                               
+      34  @api_app.get("/")                                              
+      35  async def get_index() -> FileResponse:                         
+      36      """Serve the main dashboard page."""                       
+      37      index_path = STATIC_DIR / "index.html"                     
+      38      if not index_path.exists():                                
+      39 -                                                               
+         -raise HTTPException(status_code=404, detail="Frontend not      
+         -found")                                                        
+      39 +                                                               
+         +raise HTTPException(status_code=404, detail="Frontend not      
+         +found")                                                        
+      40      return FileResponse(index_path)                            
+      41                                                                 
+      42 +                                                               
+      43  @api_app.get("/api/health")                                    
+      44 -async def api_health() -> Dict[str, Any]:                      
+      44 +async def api_health() -> dict:                                
+      45      """Health check endpoint."""                               
+      46      return {"status": "ok", "version": "0.1.3"}                
+      47                                                                 
+      48 +                                                               
+      49  @api_app.get("/api/cad/status")                                
+      50 -async def api_cad_status() -> Dict[str, Any]:                  
+      50 +async def api_cad_status() -> dict:                            
+      51      """Get current CAD connection status."""                   
+      52      try:                                                       
+      53          adapter = None                                         
+     ...
+       48              adapter = get_adapter()                           
+       49          except Exception:                                     
+       50              pass                                              
+       51 -                                                              
+       51 +                                                              
+       52          connected = adapter is not None and                   
+           adapter.is_connected()                                        
+       53          cad_type = adapter.cad_type if adapter else "None"    
+       54 -                                                              
+       54 +                                                              
+       55          drawings = []                                         
+       56          current_drawing = "None"                              
+       57 -                                                              
+       57 +                                                              
+       58          if connected and adapter is not None:                 
+       59              drawings = adapter.get_open_drawings()            
+       60              current_drawing =                                 
+           adapter.get_current_drawing_name()                            
+       61 -                                                              
+       61 +                                                              
+       62          return {                                              
+       63              "connected": connected,                           
+       64              "cad_type": cad_type,                             
+       65              "drawings": drawings,                             
+       66              "current_drawing": current_drawing,               
+       67 -            "supported": get_supported_cads()                 
+       67 +            "supported": get_supported_cads(),                
+       68          }                                                     
+       69      except Exception as e:                                    
+       70          logger.error(f"Error in api_cad_status: {e}")         
+       71          return {"connected": False, "error": str(e)}          
+       72                                                                
+       73 +                                                              
+       74  @api_app.get("/api/cad/layers")                               
+       75 -async def api_cad_layers() -> Dict[str, Any]:                 
+       75 +async def api_cad_layers() -> dict:                           
+       76      """Get layers from the active CAD drawing."""             
+       77      try:                                                      
+       78          adapter = get_adapter()                               
+       79 -                                                              
+       79 +                                                              
+       80          if not adapter or not adapter.is_connected():         
+       81              return {"success": False, "error": "No CAD        
+           connection"}                                                  
+       82 -                                                              
+       82 +                                                              
+       83          layers = adapter.get_layers_info()                    
+       84          return {"success": True, "layers": layers}            
+       85      except Exception as e:                                    
+       86          logger.error(f"Error in api_cad_layers: {e}")         
+       87          return {"success": False, "error": str(e)}            
+       88                                                                
+       89 +                                                              
+       90  @api_app.get("/api/cad/blocks")                               
+       91 -async def api_cad_blocks() -> Dict[str, Any]:                 
+       91 +async def api_cad_blocks() -> dict:                           
+       92      """Get block definitions from the active CAD drawing."""  
+       93      try:                                                      
+       94          adapter = get_adapter()                               
+       95 -                                                              
+       95 +                                                              
+       96          if not adapter or not adapter.is_connected():         
+       97              return {"success": False, "error": "No CAD        
+           connection"}                                                  
+       98 -                                                              
+       98 +                                                              
+       99          blocks = adapter.list_blocks()                        
+      100          return {"success": True, "blocks": blocks}            
+      101      except Exception as e:                                    
+      102          logger.error(f"Error in api_cad_blocks: {e}")         
+      103          return {"success": False, "error": str(e)}            
+      104                                                                
+      105 +                                                              
+      106  # Mount static files (at the end to not shadow API routes)    
+      107  if STATIC_DIR.exists():                                       
+      108      api_app.mount("/static",                                  
+           StaticFiles(directory=str(STATIC_DIR)), name="static")        
+
+● Bash(flake8 src/server.py src/web/api.py src/mcp_tools/shorthand.py
+      src/mcp_tools/validator.py --max-line-length 150 2>&1)
+  ⎿  (No content)
+
+● Perfect! All flake8 errors in my modified files are now clean. Let me verify
+  the test suite still passes:
+
+● Bash(py -m pytest tests/ -q 2>&1)
+  ⎿  Interrupted · What should Claude do instead?

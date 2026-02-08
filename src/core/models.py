@@ -479,3 +479,86 @@ class ScaleEntityRequest(BaseModel):
         CoordinateModel.from_tuple(self.base_point)
 
         return self
+
+
+# ========== Drawing Request Models (continued) ==========
+
+
+class DrawLeaderRequest(BaseModel):
+    """Request model for drawing a leader (dimension leader line)."""
+
+    points: List[Tuple[float, float] | Tuple[float, float, float]] = Field(
+        min_length=2, description="At least 2 points required for a leader"
+    )
+    text: Optional[str] = Field(default=None, description="Optional annotation text")
+    text_height: float = Field(gt=0, default=2.5, description="Height of annotation text")
+    layer: str = "0"
+    color: Union[str, int] = "white"
+    leader_type: str = Field(
+        default="line_with_arrow",
+        description="Leader type: line_with_arrow, line_no_arrow, spline_with_arrow, spline_no_arrow",
+    )
+
+    @model_validator(mode="after")
+    def validate_all(self) -> "DrawLeaderRequest":
+        """Validate all fields."""
+        # Validate all points
+        for point in self.points:
+            CoordinateModel.from_tuple(point)
+
+        # Validate color
+        ColorValidator(color=self.color)
+
+        # Validate layer
+        LayerValidator(layer=self.layer)
+
+        # Validate leader_type
+        valid_types = ["line_with_arrow", "line_no_arrow", "spline_with_arrow", "spline_no_arrow"]
+        if self.leader_type.lower() not in valid_types:
+            raise ValueError(
+                f"Invalid leader_type '{self.leader_type}'. Must be one of: {valid_types}"
+            )
+
+        return self
+
+
+class DrawMLeaderRequest(BaseModel):
+    """Request model for drawing a multi-leader (multiple arrow leaders)."""
+
+    base_point: Tuple[float, float] | Tuple[float, float, float] = Field(
+        description="Base point for the multi-leader annotation"
+    )
+    leader_groups: List[List[Tuple[float, float] | Tuple[float, float, float]]] = Field(
+        min_length=1, description="List of leader line point groups (minimum 1 line, each with 2+ points)"
+    )
+    text: Optional[str] = Field(default=None, description="Optional annotation text")
+    text_height: float = Field(gt=0, default=2.5, description="Height of annotation text")
+    layer: str = "0"
+    color: Union[str, int] = "white"
+    arrow_style: str = Field(
+        default="_ARROW",
+        description="Arrow head style: _ARROW, _DOT, _CLOSED_FILLED, etc.",
+    )
+
+    @model_validator(mode="after")
+    def validate_all(self) -> "DrawMLeaderRequest":
+        """Validate all fields."""
+        # Validate base point
+        CoordinateModel.from_tuple(self.base_point)
+
+        # Validate each leader group has at least 2 points
+        for i, group in enumerate(self.leader_groups):
+            if len(group) < 2:
+                raise ValueError(
+                    f"Leader group {i} has {len(group)} points, minimum 2 required"
+                )
+            for point in group:
+                CoordinateModel.from_tuple(point)
+
+        # Validate color
+        ColorValidator(color=self.color)
+
+        # Validate layer
+        LayerValidator(layer=self.layer)
+
+        return self

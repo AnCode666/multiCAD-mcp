@@ -2,19 +2,18 @@
 
 ## Summary
 
-**54 MCP tools** organized in 9 categories:
+**7 unified MCP tools** providing access to **54 CAD commands**:
 
-| Category | Tools | Batch |
-|----------|-------|-------|
-| Connection | 4 | - |
-| Drawing | 10 | 8 |
-| Blocks | 5 | 1 |
-| Layers | 8 | 4 |
-| Files | 5 | - |
-| Entities | 13 | 3 |
-| Simple | 3 | - |
-| Export | 4 | - |
-| Debug | 2 | - |
+| Unified Tool | Commands | Category |
+|--------------|----------|----------|
+| `manage_session` | 4 | Connection & Control |
+| `draw_entities` | 10 | Unified Drawing |
+| `manage_blocks` | 5 | Block Management |
+| `manage_layers` | 8 | Layer Management |
+| `manage_files` | 5 | File Operations |
+| `manage_entities` | 13 | Entity Management |
+| `export_data` | 4 | Data Extraction |
+| `debug_entities` | 2 | Diagnostics |
 
 ---
 
