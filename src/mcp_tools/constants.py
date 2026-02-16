@@ -57,3 +57,15 @@ CLIPBOARD_DELAY = 300
 CLIPBOARD_STABILITY_DELAY = 500
 CLICK_DELAY = 50
 CLICK_HOLD_DELAY = 20
+COMMAND_EXECUTE_DELAY = 100
+EXPORT_WRITE_DELAY = 1500
+COM_INIT_TIMEOUT = 20000
+
+# ========== CAD Window Search Terms ==========
+
+CAD_WINDOW_SEARCH_TERMS = {
+    "autocad": "Autodesk AutoCAD",
+    "zwcad": "ZWCAD",
+    "gcad": "GstarCAD",
+    "bricscad": "BricsCAD",
+}

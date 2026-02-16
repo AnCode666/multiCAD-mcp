@@ -26,6 +26,7 @@ else:
 
 from core import (
     CADOperationError,
+    CADConnectionError,
     Point,
     ConfigManager,
 )
@@ -34,6 +35,7 @@ from mcp_tools.constants import (
     AUTOCAD_WINDOW_CLASSES,
     CLICK_DELAY,
     CLICK_HOLD_DELAY,
+    CAD_WINDOW_SEARCH_TERMS,
 )
 
 logger = logging.getLogger(__name__)
@@ -466,4 +468,72 @@ class UtilityMixin:
             raise CADOperationError(
                 "resolve_export_path",
                 f"Path traversal detected: {resolved_path} is outside {output_dir}"
+            )
+
+    def _handle_operation_error(
+        self,
+        operation_name: str,
+        error: Exception,
+        default_return: Any = False,
+    ) -> Any:
+        """Standardized error handling for all mixin operations.
+
+        Logs errors consistently and determines whether to re-raise or return default.
+
+        Args:
+            operation_name: Name of the operation that failed
+            error: The exception that was raised
+            default_return: Default value to return for non-critical errors
+
+        Returns:
+            The default_return value, unless it's a critical error that should propagate
+
+        Raises:
+            If error is a critical exception (CADConnectionError, CADOperationError)
+        """
+        logger.error(f"{operation_name} failed: {error}")
+        # Re-raise critical errors, return default for others
+        if isinstance(error, (CADConnectionError, CADOperationError)):
+            raise
+        return default_return
+
+    def _iterate_entities_safe(
+        self,
+        operation_name: str,
+        callback: Callable[[Any], bool],
+    ) -> tuple[int, int]:
+        """Safely iterate through entities with standardized error handling.
+
+        Provides consistent iteration, error logging, and metrics collection.
+
+        Args:
+            operation_name: Name of the operation being performed
+            callback: Function to call for each entity, returns True if successful
+
+        Returns:
+            Tuple of (successful_count, total_count)
+        """
+        try:
+            document = self._get_document(operation_name)
+        except Exception as e:
+            return self._handle_operation_error(operation_name, e, default_return=(0, 0))
+
+        success_count = 0
+        total_count = 0
+
+        try:
+            for entity in document.ModelSpace:
+                total_count += 1
+                try:
+                    if callback(entity):
+                        success_count += 1
+                except Exception as e:
+                    logger.debug(f"{operation_name} skipped entity: {e}")
+                    continue
+
+            logger.info(f"{operation_name}: {success_count}/{total_count} processed")
+            return success_count, total_count
+        except Exception as e:
+            return self._handle_operation_error(
+                operation_name, e, default_return=(success_count, total_count)
             )
