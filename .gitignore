@@ -12,6 +12,14 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Test artifacts
+test_*.py
+test_*.png
+test_*.txt
+verify_*.py
+debug_*.py
+dxf_dump.txt
+
 # Logging
 multicad_mcp.log
 
