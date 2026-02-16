@@ -4,6 +4,7 @@ Loads from config.json with fallback defaults.
 """
 
 import json
+import threading
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
@@ -38,15 +39,18 @@ class ServerConfig:
 
 
 class ConfigManager:
-    """Manages loading and accessing configuration."""
+    """Manages loading and accessing configuration (thread-safe singleton)."""
 
     _instance: Optional["ConfigManager"] = None
     _config: Optional[ServerConfig] = None
+    _lock = threading.Lock()  # Class-level lock for singleton instantiation
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._load_config()
+            with cls._lock:  # Acquire lock for singleton creation
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._load_config()
         return cls._instance
 
     @classmethod

@@ -9,11 +9,13 @@ import base64
 import tempfile
 import os
 import time
+import re
 import win32gui
 import win32con
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Optional
 from core.config import ConfigManager
+from core.exceptions import CADOperationError
 from PIL import ImageGrab
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,7 @@ class ViewMixin:
     if TYPE_CHECKING:
         # Tell type checker this mixin is used with CADAdapterProtocol
         from typing import Any
-        
+
         # Attributes from AutoCADAdapter
         cad_type: str
 
@@ -33,6 +35,27 @@ class ViewMixin:
         def _get_document(self, operation: str = "operation") -> Any: ...
         def _simulate_autocad_click(self) -> bool: ...
         def _validate_connection(self) -> None: ...
+
+    def _sanitize_command_input(self, user_input: str) -> str:
+        """Sanitize input for SendCommand to prevent command injection.
+
+        Restricts input to safe characters that are common in file paths and CAD commands.
+        Non-matching characters are removed.
+
+        Args:
+            user_input: The user-provided input to sanitize
+
+        Returns:
+            str: The sanitized input safe for SendCommand
+        """
+        safe_pattern = re.compile(r'^[a-zA-Z0-9\s\\/._\-:()]+$')
+        if not safe_pattern.match(user_input):
+            logger.warning(f"Input sanitized due to unsafe characters: {user_input}")
+            # Remove all characters that don't match safe pattern
+            sanitized = re.sub(r'[^a-zA-Z0-9\s\\/._\-:()]', '', user_input)
+            logger.debug(f"Sanitized to: {sanitized}")
+            return sanitized
+        return user_input
 
     def get_screenshot(self) -> Dict[str, str]:
         """
@@ -189,7 +212,8 @@ class ViewMixin:
             
             # Execute PNGOUT command with file path
             # Sequence: command, path, selection (all), finish selection
-            document.SendCommand(f"_PNGOUT\n{filepath_cad}\n_ALL\n\n")
+            safe_path = self._sanitize_command_input(filepath_cad)
+            document.SendCommand(f"_PNGOUT\n{safe_path}\n_ALL\n\n")
             
             # Wait briefly for file to be written
             time.sleep(1.5) # Increased wait for render
@@ -201,7 +225,8 @@ class ViewMixin:
             if not os.path.exists(filepath):
                 # Try fallback: maybe it didn't like _ALL, try just \n\n
                 logger.debug("PNGOUT with _ALL failed, trying with default selection...")
-                document.SendCommand(f"_PNGOUT\n{filepath_cad}\n\n")
+                safe_path_fallback = self._sanitize_command_input(filepath_cad)
+                document.SendCommand(f"_PNGOUT\n{safe_path_fallback}\n\n")
                 time.sleep(1.5)
                 
             if not os.path.exists(filepath):

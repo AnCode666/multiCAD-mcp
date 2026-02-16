@@ -440,15 +440,30 @@ class UtilityMixin:
         # Resolve final path
         final_path = (target_dir / filename).resolve()
 
-        # SECURITY: Ensure it's still inside output_dir
-        try:
-            final_path.relative_to(output_dir)
-        except ValueError:
-            logger.error(
-                f"Security violation: path {final_path} is outside {output_dir}"
-            )
-            # Fallback to safe path
-            final_path = target_dir / Path(filename).name
+        # SECURITY: Validate path to prevent traversal attacks
+        self._validate_export_path(final_path, output_dir)
 
         logger.debug(f"Resolved export path for {folder_type}: {final_path}")
         return str(final_path)
+
+    def _validate_export_path(self, resolved_path: Path, output_dir: Path) -> bool:
+        """Prevent path traversal by validating resolved_path is within output_dir.
+
+        Args:
+            resolved_path: The resolved absolute path to validate
+            output_dir: The allowed parent directory
+
+        Returns:
+            bool: True if path is safe
+
+        Raises:
+            CADOperationError: If path traversal is detected
+        """
+        try:
+            resolved_path.resolve().relative_to(output_dir.resolve())
+            return True
+        except ValueError:
+            raise CADOperationError(
+                "resolve_export_path",
+                f"Path traversal detected: {resolved_path} is outside {output_dir}"
+            )

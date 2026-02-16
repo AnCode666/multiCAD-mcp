@@ -38,12 +38,16 @@ class ConnectionMixin:
         ) -> bool: ...
 
     def connect(self) -> bool:
-        """Connect to CAD application with COM initialization."""
+        """Connect to CAD application with COM initialization (thread-safe)."""
         try:
             logger.info(f"Connecting to {self.cad_type}...")
 
             # Initialize COM for this thread
-            pythoncom.CoInitialize()
+            # CoInitialize() may raise if already initialized, which is fine
+            try:
+                pythoncom.CoInitialize()
+            except Exception as e:
+                logger.debug(f"CoInitialize: {e} (may already be initialized for thread)")
 
             # Try to get existing instance
             try:
