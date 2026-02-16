@@ -26,41 +26,18 @@ multiCAD-mcp is an MCP server that lets you control your CAD software using AI a
 
 ## Installation
 
-### 1. Clone the Repository
+Detailed installation instructions are available in [docs/01-SETUP.md](docs/01-SETUP.md).
+
+Quick start:
 
 ```powershell
 git clone https://github.com/AnCode666/multiCAD-mcp.git
 cd multiCAD-mcp
-```
-
-### 2. Setup Virtual Environment (Recommended)
-
-```powershell
-# Create virtual environment
 py -m venv .venv
-
-# Activate it
 .venv\Scripts\Activate.ps1
-```
-
-### 3. Install Dependencies
-
-```powershell
 pip install -r requirements.txt
 py -m pip install --upgrade pywin32
 ```
-
-### 4. Verify Installation
-
-Start the server to verify everything works:
-
-```powershell
-py src/server.py
-```
-
-You should see output indicating that the server has started and auto-detected your CAD application.
-
-**For developers**: See [docs/01-SETUP.md](docs/01-SETUP.md) for detailed setup and troubleshooting.
 
 ## Setup with Claude Desktop
 
@@ -207,6 +184,14 @@ Available levels (from most to least verbose):
 - Verify connection status with the **check_connection** tool
 - Enable DEBUG logging to see detailed command execution information
 
+## Documentation
+
+- [**Setup & Installation**](docs/01-SETUP.md) - detailed setup guide and Claude Desktop integration.
+- [**Architecture**](docs/02-ARCHITECTURE.md) - system design and extension guide.
+- [**Troubleshooting**](docs/04-TROUBLESHOOTING.md) - solutions for common issues.
+- [**Reference**](docs/05-REFERENCE.md) - complete MCP tool reference.
+- [**Changelog**](docs/07-CHANGELOG.md) - version history.
+
 ## Supported CAD Applications
 
 | Application | Status | Notes |
@@ -218,30 +203,17 @@ Available levels (from most to least verbose):
 
 ## Project Status
 
-**Version 0.1.2** - Block creation, code optimization, and set color by layer
-
-- **7 Unified MCP tools** providing access to **54 CAD commands**
-- **Block creation** from entity handles or user selection
-- **Batch operation support** for ~70% API call reduction
-- **Selection-based export** - Export only selected entities to Excel/JSON
-- Comprehensive error handling
-- Full type safety with Python type hints
-- Automated tests for all major components
+**Version 0.1.3** - Refactored adapter architecture, block creation, and code optimization.
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) file for details
-
-This project is licensed under the Apache License 2.0.
+Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-This project builds upon the work of two foundational projects in CAD-MCP integration:
-
-- **[CAD-MCP](https://github.com/daobataotie/CAD-MCP)** - The original CAD-MCP server implementation that demonstrated how to bridge natural language processing with CAD automation through the Model Context Protocol
-- **[Easy-MCP-AutoCAD](https://github.com/zh19980811/Easy-MCP-AutoCad)** - An AutoCAD-specific MCP integration that showed practical approaches to AI-driven CAD control
-
-These projects provided essential inspiration and architectural insights that shaped multiCAD-mcp's base design. multiCAD-mcp expands upon their foundations to create a more robust, multi-CAD compatible, and complete solution.
+This project builds upon:
+- [CAD-MCP](https://github.com/daobataotie/CAD-MCP)
+- [Easy-MCP-AutoCAD](https://github.com/zh19980811/Easy-MCP-AutoCad)
 
 ## Support
 
@@ -250,13 +222,3 @@ For issues, questions, or feature requests, please open an issue on the reposito
 ---
 
 **Need help setting up?** Start with the installation steps above.
-
-## Learning More
-
-For developers wanting to extend or customize multiCAD-mcp, see the `docs/` folder:
-
-- [**docs/01-SETUP.md**](docs/01-SETUP.md) - Development setup
-- [**docs/02-ARCHITECTURE.md**](docs/02-ARCHITECTURE.md) - How the system works
-- [**docs/03-EXTENDING.md**](docs/03-EXTENDING.md) - Adding new features
-- [**docs/04-TROUBLESHOOTING.md**](docs/04-TROUBLESHOOTING.md) - Debugging guide
-- [**docs/05-REFERENCE.md**](docs/05-REFERENCE.md) - Complete tool reference

@@ -1,0 +1,164 @@
+{
+  "prices": [
+    {
+      "code": "ESTR001",
+      "ifc_class": "IfcBeam",
+      "description": "Beam structural element",
+      "long_description": "Structural beam element in concrete, steel or wood. Includes formwork, reinforcement and concrete pouring.",
+      "unit": "m",
+      "unit_price": 150.00
+    },
+    {
+      "code": "ESTR002",
+      "ifc_class": "IfcColumn",
+      "description": "Column structural element",
+      "long_description": "Structural column element in concrete, steel or composite. Includes formwork, reinforcement, concrete and finishes.",
+      "unit": "m",
+      "unit_price": 180.00
+    },
+    {
+      "code": "ESTR003",
+      "ifc_class": "IfcFooting",
+      "description": "Footing structural element",
+      "long_description": "Foundation footing element. Includes excavation, lean concrete, reinforcement, concrete and waterproofing.",
+      "unit": "m3",
+      "unit_price": 120.00
+    },
+    {
+      "code": "ESTR004",
+      "ifc_class": "IfcPile",
+      "description": "Pile structural element",
+      "long_description": "Deep foundation pile element. Includes drilling, reinforcement cage and concrete filling.",
+      "unit": "m",
+      "unit_price": 200.00
+    },
+    {
+      "code": "ESTR005",
+      "ifc_class": "IfcRamp",
+      "description": "Ramp structural element",
+      "long_description": "Accessibility ramp structure. Includes concrete base, reinforcement, surface finishing and handrails.",
+      "unit": "m2",
+      "unit_price": 140.00
+    },
+    {
+      "code": "ESTR006",
+      "ifc_class": "IfcStair",
+      "description": "Stair structural element",
+      "long_description": "Staircase unit including structure, steps, risers, handrails and surface finishes.",
+      "unit": "ud",
+      "unit_price": 160.00
+    },
+    {
+      "code": "ALB001",
+      "ifc_class": "IfcWall",
+      "description": "Wall masonry element",
+      "long_description": "Masonry wall construction. Includes brickwork or blockwork, mortar, insulation and plaster finishes on both sides.",
+      "unit": "m2",
+      "unit_price": 85.00
+    },
+    {
+      "code": "ALB002",
+      "ifc_class": "IfcWallStandardCase",
+      "description": "WallStandardCase masonry element",
+      "long_description": "Standard masonry wall with standard layers. Includes structural blocks, thermal insulation and interior/exterior finishes.",
+      "unit": "m2",
+      "unit_price": 90.00
+    },
+    {
+      "code": "FORG001",
+      "ifc_class": "IfcSlab",
+      "description": "Slab forging element",
+      "long_description": "Concrete slab construction. Includes formwork, reinforcement mesh, concrete pouring and surface finishing.",
+      "unit": "m3",
+      "unit_price": 110.00
+    },
+    {
+      "code": "FORG002",
+      "ifc_class": "IfcRoof",
+      "description": "Roof forging element",
+      "long_description": "Roof structure and covering system. Includes structural layer, thermal insulation, waterproofing membrane and protective layer.",
+      "unit": "m2",
+      "unit_price": 130.00
+    },
+    {
+      "code": "FORG003",
+      "ifc_class": "IfcCovering",
+      "description": "Covering forging element",
+      "long_description": "Floor or ceiling covering installation. Includes base preparation, adhesive, covering material and finishing joints.",
+      "unit": "m2",
+      "unit_price": 95.00
+    },
+    {
+      "code": "CARP001",
+      "ifc_class": "IfcDoor",
+      "description": "Door carpentry element",
+      "long_description": "Door unit including frame, door leaf, hinges, lock, handles and finishes. Installation and adjustment included.",
+      "unit": "ud",
+      "unit_price": 250.00
+    },
+    {
+      "code": "CARP002",
+      "ifc_class": "IfcWindow",
+      "description": "Window carpentry element",
+      "long_description": "Window unit with frame, glazing, opening mechanism, weatherstripping and hardware. Installation and sealing included.",
+      "unit": "ud",
+      "unit_price": 300.00
+    },
+    {
+      "code": "INST001",
+      "ifc_class": "IfcFlowSegment",
+      "description": "FlowSegment installation element",
+      "long_description": "Pipe or duct segment for fluid distribution systems. Includes material, fittings, supports and installation.",
+      "unit": "m",
+      "unit_price": 75.00
+    },
+    {
+      "code": "INST002",
+      "ifc_class": "IfcFlowFitting",
+      "description": "FlowFitting installation element",
+      "long_description": "Pipe or duct fitting element (elbow, tee, reducer, etc.). Includes material, gaskets and installation.",
+      "unit": "ud",
+      "unit_price": 60.00
+    },
+    {
+      "code": "INST003",
+      "ifc_class": "IfcFlowTerminal",
+      "description": "FlowTerminal installation element",
+      "long_description": "Terminal device for HVAC or plumbing systems (diffuser, outlet, tap, etc.). Includes device, connections and commissioning.",
+      "unit": "ud",
+      "unit_price": 80.00
+    },
+    {
+      "code": "INST004",
+      "ifc_class": "IfcDistributionElement",
+      "description": "DistributionElement installation element",
+      "long_description": "General distribution system element. Includes component, accessories, supports and installation work.",
+      "unit": "ud",
+      "unit_price": 70.00
+    },
+    {
+      "code": "INST005",
+      "ifc_class": "IfcRailing",
+      "description": "Railing installation element",
+      "long_description": "Railing or guardrail system. Includes posts, handrail, infill panels, anchors and surface treatment.",
+      "unit": "m",
+      "unit_price": 100.00
+    },
+    {
+      "code": "MOB001",
+      "ifc_class": "IfcFurnishingElement",
+      "description": "FurnishingElement furniture element",
+      "long_description": "Built-in furnishing element. Includes manufacturing, finishing, hardware, delivery and installation.",
+      "unit": "ud",
+      "unit_price": 120.00
+    },
+    {
+      "code": "MOB002",
+      "ifc_class": "IfcFurniture",
+      "description": "Furniture element",
+      "long_description": "Furniture unit or piece. Includes product, assembly, adjustment and placement in final position.",
+      "unit": "ud",
+      "unit_price": 150.00
+    }
+  ]
+}

@@ -9,7 +9,7 @@ Provides decorators for standardizing adapter access and error handling:
 from functools import wraps
 from typing import Callable, TypeVar, Optional, Any, Dict
 
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP
 
 from core import CADOperationError
 
@@ -103,12 +103,12 @@ def cad_tool(mcp: FastMCP, operation_name: str):
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        def wrapper(ctx: Context, *args, cad_type: Optional[str] = None, **kwargs) -> T:
+        def wrapper(*args, **kwargs) -> T:
             from adapters.adapter_manager import get_adapter
 
             try:
-                set_current_adapter(get_adapter(cad_type))
-                return func(ctx, *args, **kwargs)
+                set_current_adapter(get_adapter(None))
+                return func(*args, **kwargs)
             except CADOperationError:
                 raise
             except Exception as e:
@@ -146,7 +146,7 @@ def cad_tool_with_ui(
 
     Usage:
         @cad_tool_with_ui(mcp, "extract_drawing_data", ui_resource="drawing_viewer")
-        def extract_drawing_data(ctx, ...):
+        def extract_drawing_data(...):
             adapter = get_current_adapter()
             return adapter.extract_drawing_data(...)
 
@@ -157,12 +157,12 @@ def cad_tool_with_ui(
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
-        def wrapper(ctx: Context, *args, cad_type: Optional[str] = None, **kwargs) -> T:
+        def wrapper(*args, **kwargs) -> T:
             from adapters.adapter_manager import get_adapter
 
             try:
-                set_current_adapter(get_adapter(cad_type))
-                return func(ctx, *args, **kwargs)
+                set_current_adapter(get_adapter(None))
+                return func(*args, **kwargs)
             except CADOperationError:
                 raise
             except Exception as e:

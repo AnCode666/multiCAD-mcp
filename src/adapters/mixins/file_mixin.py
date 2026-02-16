@@ -49,47 +49,13 @@ class FileMixin:
             # SECURITY: Resolve output directory first (reference for validation)
             output_dir = Path(config.output.directory).expanduser().resolve()
 
-            # ========== Determine Directory (filepath) ==========
-            if filepath:
-                # If filepath provided, extract directory part
-                dir_part = str(Path(filepath).parent)
-                if dir_part and dir_part != ".":
-                    save_dir = dir_part
-                else:
-                    save_dir = str(output_dir)
-            else:
-                save_dir = str(output_dir)
-
-            # Convert to absolute path (required by AutoCAD COM API)
-            save_dir_path = Path(save_dir).expanduser().resolve()
-
-            # SECURITY: Verify the directory is within the configured output directory
-            try:
-                save_dir_path.relative_to(output_dir)
-            except ValueError:
-                logger.error(
-                    f"Security: Attempted to save outside output directory. "
-                    f"Requested: {save_dir_path}, Allowed: {output_dir}"
-                )
-                raise CADOperationError(
-                    "save_drawing",
-                    f"File path must be within {output_dir}",
-                )
-
-            # Create directory if it doesn't exist
-            save_dir_path.mkdir(parents=True, exist_ok=True)
-
             # ========== Determine Filename ==========
             if filepath:
-                file_part = str(Path(filepath).name)
-                if file_part and file_part != ".":
-                    save_filename = file_part
-                elif filename:
-                    save_filename = filename
-                else:
-                    save_filename = None
-            else:
+                save_filename = Path(filepath).name
+            elif filename:
                 save_filename = filename
+            else:
+                save_filename = None
 
             # If still no filename, use document name or generate one
             if not save_filename:
@@ -102,24 +68,13 @@ class FileMixin:
                     save_filename = f"drawing_{timestamp}.{format}"
 
             # ========== Ensure Correct File Extension ==========
+            # Only add extension if it's not already there
             if not save_filename.lower().endswith(f".{format}"):
                 save_filename = f"{save_filename}.{format}"
 
-            # ========== Combine Directory + Filename ==========
-            final_path = save_dir_path / save_filename
-
-            # SECURITY: Final validation - ensure combined path is still within output directory
-            try:
-                final_path.resolve().relative_to(output_dir)
-            except ValueError:
-                logger.error(
-                    f"Security: Final path validation failed. "
-                    f"Path: {final_path}, Allowed dir: {output_dir}"
-                )
-                raise CADOperationError(
-                    "save_drawing",
-                    f"Invalid file path: {final_path}",
-                )
+            # ========== Resolve Final Path using Centralized Utility ==========
+            final_path_str = self.resolve_export_path(save_filename, "drawings")
+            final_path = Path(final_path_str)
 
             # Save the drawing
             document.SaveAs(str(final_path))

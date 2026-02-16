@@ -2,7 +2,7 @@
 
 Based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.1.3] - 2025-01-21
+## [0.1.3] - 2026-02-12
 
 ### Changed - Mixin Architecture Refactor
 
@@ -41,6 +41,12 @@ Major refactoring of the adapter layer for better maintainability.
 #### Bug Fixes
 
 - Fixed `@staticmethod` error in `validate_lineweight`
+
+### Improvements
+
+- **Refactored `DrawingMixin`**: Reduces boilerplate code in drawing methods using `_finalize_entity` helper.
+- **Simplified `draw_mleader`**: Extracted complex fallback logic to improve readability.
+- **Documentation**: Simplified `README.md` and updated documentation structure.
 
 ---
 

@@ -7,6 +7,8 @@ Contains helper methods, decorators, context managers, and utility classes.
 import logging
 import time
 import math
+import os
+from pathlib import Path
 from typing import Any, Callable, TypeVar, List, Optional, TYPE_CHECKING
 from functools import wraps
 from contextlib import contextmanager
@@ -25,6 +27,7 @@ else:
 from core import (
     CADOperationError,
     Point,
+    ConfigManager,
 )
 from mcp_tools.constants import (
     COLOR_MAP,
@@ -401,3 +404,51 @@ class UtilityMixin:
         except Exception as e:
             logger.debug(f"_simulate_autocad_click error: {e}")
             return False
+
+    def resolve_export_path(self, filename: str, folder_type: str = "drawings") -> str:
+        """Centralized path resolution for all export operations.
+
+        Handles:
+        1. Configured output directory (from config.json)
+        2. Subfolder hierarchy (drawings, images, sheets)
+        3. Tilde expansion and absolute path resolution
+        4. Security validation (must be within output directory)
+        5. Directory creation
+
+        Args:
+            filename: Name of the file with extension
+            folder_type: Subfolder category ('drawings', 'images', 'sheets')
+
+        Returns:
+            str: Full absolute path to the resolved file
+        """
+        config = ConfigManager()
+        output_dir = Path(config.ensure_output_directory()).expanduser().resolve()
+
+        # Define subfolder
+        subfolder_mapping = {
+            "drawings": "drawings",
+            "images": "images",
+            "sheets": "sheets",
+        }
+        subfolder_name = subfolder_mapping.get(folder_type, folder_type)
+        target_dir = output_dir / subfolder_name
+
+        # Create subfolder if it doesn't exist
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Resolve final path
+        final_path = (target_dir / filename).resolve()
+
+        # SECURITY: Ensure it's still inside output_dir
+        try:
+            final_path.relative_to(output_dir)
+        except ValueError:
+            logger.error(
+                f"Security violation: path {final_path} is outside {output_dir}"
+            )
+            # Fallback to safe path
+            final_path = target_dir / Path(filename).name
+
+        logger.debug(f"Resolved export path for {folder_type}: {final_path}")
+        return str(final_path)

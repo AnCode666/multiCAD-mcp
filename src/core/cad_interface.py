@@ -785,6 +785,18 @@ class CADInterface(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_screenshot(self) -> Dict[str, str]:
+        """
+        Capture a screenshot of the CAD application window.
+
+        Returns:
+            dict: Dictionary with keys:
+                - path: Path to the temporary screenshot file
+                - data: Base64 encoded image data (for embedding)
+        """
+        pass
+
     # ========== Entity Management ==========
 
     @abstractmethod

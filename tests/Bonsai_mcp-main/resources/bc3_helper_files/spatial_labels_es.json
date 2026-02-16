@@ -1,0 +1,10 @@
+{
+  "spatial_labels": {
+    "IfcProject": "Proyecto",
+    "IfcSite": "Parcela",
+    "IfcBuilding": "Edificio",
+    "IfcBuildingStorey": "Planta",
+    "IfcBridge": "Puente",
+    "IfcBridgePart": "Subestructura"
+  }
+}

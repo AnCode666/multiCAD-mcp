@@ -15,7 +15,7 @@ import json
 import logging
 from typing import Optional, Dict, Any, Callable, List, Tuple
 
-from mcp.server.fastmcp import Context
+
 
 from mcp_tools.decorators import cad_tool, get_current_adapter
 from mcp_tools.helpers import parse_coordinate
@@ -153,9 +153,7 @@ def register_block_tools(mcp) -> None:
 
     @cad_tool(mcp, "manage_blocks")
     def manage_blocks(
-        ctx: Context,
         operations: str,
-        cad_type: Optional[str] = None,
     ) -> str:
         """
         Manage blocks: create, insert, list, or query block information.
@@ -181,7 +179,7 @@ def register_block_tools(mcp) -> None:
 
                 JSON format also supported for backwards compatibility.
 
-            cad_type: CAD application to use
+
 
         Returns:
             JSON result with per-operation status

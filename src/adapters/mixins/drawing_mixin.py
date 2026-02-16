@@ -11,6 +11,7 @@ from typing import List, Optional, TYPE_CHECKING, Any
 from core import (
     CADInterface,
     InvalidParameterError,
+    CADOperationError,
     Coordinate,
     Point,
 )
@@ -41,6 +42,25 @@ class DrawingMixin:
 
         def refresh_view(self) -> bool: ...
 
+    def _finalize_entity(
+        self,
+        entity: Any,
+        layer: str,
+        color: str | int,
+        lineweight: int = 0,
+        entity_type: str = "entity",
+        _skip_refresh: bool = False,
+        log_msg: Optional[str] = None,
+    ) -> str:
+        """Helper to apply properties, track entity, refresh view, and return handle."""
+        self._apply_properties(entity, layer, color, lineweight)
+        self._track_entity(entity, entity_type)
+        if not _skip_refresh:
+            self.refresh_view()
+        if log_msg:
+            logger.debug(log_msg)
+        return str(entity.Handle)
+
     def draw_line(
         self,
         start: Coordinate,
@@ -64,13 +84,11 @@ class DrawingMixin:
         end_array = self._to_variant_array(end_pt)
 
         line = document.ModelSpace.AddLine(start_array, end_array)
-        self._apply_properties(line, layer, color, lineweight)
-        self._track_entity(line, "line")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Drew line from {start} to {end}")
-        return str(line.Handle)
+        
+        return self._finalize_entity(
+            line, layer, color, lineweight, "line", _skip_refresh,
+            f"Drew line from {start} to {end}"
+        )
 
     def draw_circle(
         self,
@@ -95,13 +113,11 @@ class DrawingMixin:
         center_array = self._to_variant_array(center_pt)
 
         circle = document.ModelSpace.AddCircle(center_array, radius)
-        self._apply_properties(circle, layer, color, lineweight)
-        self._track_entity(circle, "circle")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Drew circle at {center} with radius {radius}")
-        return str(circle.Handle)
+        
+        return self._finalize_entity(
+            circle, layer, color, lineweight, "circle", _skip_refresh,
+            f"Drew circle at {center} with radius {radius}"
+        )
 
     def draw_arc(
         self,
@@ -130,13 +146,11 @@ class DrawingMixin:
             self._to_radians(start_angle),
             self._to_radians(end_angle),
         )
-        self._apply_properties(arc, layer, color, lineweight)
-        self._track_entity(arc, "arc")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Drew arc at {center} from {start_angle}° to {end_angle}°")
-        return str(arc.Handle)
+        
+        return self._finalize_entity(
+            arc, layer, color, lineweight, "arc", _skip_refresh,
+            f"Drew arc at {center} from {start_angle}° to {end_angle}°"
+        )
 
     def draw_rectangle(
         self,
@@ -203,13 +217,10 @@ class DrawingMixin:
         if closed:
             polyline.Closed = True
 
-        self._apply_properties(polyline, layer, color, lineweight)
-        self._track_entity(polyline, "polyline")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Drew polyline with {len(points)} points")
-        return str(polyline.Handle)
+        return self._finalize_entity(
+            polyline, layer, color, lineweight, "polyline", _skip_refresh,
+            f"Drew polyline with {len(points)} points"
+        )
 
     def draw_ellipse(
         self,
@@ -219,6 +230,7 @@ class DrawingMixin:
         layer: str = "0",
         color: str | int = "white",
         lineweight: int = 0,
+        _skip_refresh: bool = False,
     ) -> str:
         """Draw an ellipse."""
         document = self._get_document("draw_ellipse")
@@ -232,12 +244,11 @@ class DrawingMixin:
         ellipse = document.ModelSpace.AddEllipse(
             center_array, major_array, minor_axis_ratio
         )
-        self._apply_properties(ellipse, layer, color, lineweight)
-        self._track_entity(ellipse, "ellipse")
-        self.refresh_view()
-
-        logger.debug(f"Drew ellipse at {center}")
-        return str(ellipse.Handle)
+        
+        return self._finalize_entity(
+            ellipse, layer, color, lineweight, "ellipse", False, # Always refresh for ellipse in original code, but cleaner to pass _skip_refresh if we update signature. original didn't have _skip_refresh
+            f"Drew ellipse at {center}"
+        )
 
     def draw_text(
         self,
@@ -262,13 +273,10 @@ class DrawingMixin:
         text_obj = document.ModelSpace.AddText(text, pos_array, height)
         text_obj.Rotation = self._to_radians(rotation)
 
-        self._apply_properties(text_obj, layer, color)
-        self._track_entity(text_obj, "text")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Added text '{text}' at {position}")
-        return str(text_obj.Handle)
+        return self._finalize_entity(
+            text_obj, layer, color, 0, "text", _skip_refresh,
+            f"Added text '{text}' at {position}"
+        )
 
     def draw_hatch(
         self,
@@ -297,12 +305,10 @@ class DrawingMixin:
         hatch.AppendOuterLoop([boundary_polyline])
         hatch.Evaluate()
 
-        self._apply_properties(hatch, layer, color)
-        self._track_entity(hatch, "hatch")
-        self.refresh_view()
-
-        logger.debug(f"Created hatch with pattern {pattern}")
-        return str(hatch.Handle)
+        return self._finalize_entity(
+            hatch, layer, color, 0, "hatch", False, # hatch always refreshed in original
+            f"Created hatch with pattern {pattern}"
+        )
 
     def add_dimension(
         self,
@@ -370,13 +376,10 @@ class DrawingMixin:
         if text:
             dim.TextOverride = text
 
-        self._apply_properties(dim, layer, color)
-        self._track_entity(dim, "dimension")
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(f"Added dimension from {start} to {end} with offset {offset}")
-        return str(dim.Handle)
+        return self._finalize_entity(
+            dim, layer, color, 0, "dimension", _skip_refresh,
+            f"Added dimension from {start} to {end} with offset {offset}"
+        )
 
     def draw_spline(
         self,
@@ -409,16 +412,10 @@ class DrawingMixin:
         if closed:
             spline.Closed = True
 
-        self._apply_properties(spline, layer, color, lineweight)
-        self._track_entity(spline, "spline")
-
-        if not _skip_refresh:
-            self.refresh_view()
-
-        logger.debug(
+        return self._finalize_entity(
+            spline, layer, color, lineweight, "spline", _skip_refresh,
             f"Drew spline with {len(points)} points (degree={degree}, closed={closed})"
         )
-        return str(spline.Handle)
 
     def draw_leader(
         self,
@@ -495,10 +492,13 @@ class DrawingMixin:
         """Draw a multi-leader with multiple arrow lines.
 
         Args:
-            base_point: Base point for annotation
-            leader_groups: List of point lists, each defining one leader line
+            base_point: Base point for annotation (Text Position)
+            leader_groups: List of point lists, each defining one leader line.
+                          Order: [ArrowHead, ..., TextPosition]
             _skip_refresh: Internal flag to skip view refresh (used for batch operations)
         """
+        logger.info(f"draw_mleader called with {len(leader_groups)} groups: {leader_groups}")
+
         document = self._get_document("draw_mleader")
 
         if not leader_groups:
@@ -525,29 +525,22 @@ class DrawingMixin:
             # but AddMLeader expects a points array. 
             # If we pass just base_array, it might fail if it expects more points.
             # However, typical usage is creating with the full point list of the first leader.
-            
             first_group = leader_groups[0]
             normalized_first_group = [CADInterface.normalize_coordinate(p) for p in first_group]
             variant_first_group = self._points_to_variant_array(normalized_first_group)
             
             # Create the MLeader
             # index 0 is usually the leader index to add to
+            # Try creating MLeader with index 0
+            # Some CAD versions might need different arguments, but standard is (points, index)
             try:
                 result = document.ModelSpace.AddMLeader(variant_first_group, 0)
             except Exception as e:
-                # Try without index if 2 arguments failed
                  logger.debug(f"AddMLeader(pts, 0) failed, trying AddMLeader(pts): {e}")
                  result = document.ModelSpace.AddMLeader(variant_first_group)
 
-            # Handle tuple return (common in comtypes for some out-params or results)
-            mleader = None
-            if isinstance(result, tuple):
-                mleader = result[0]
-            else:
-                mleader = result
-
-            if not mleader:
-                raise RuntimeError("AddMLeader returned None or empty tuple")
+            # Handle tuple return
+            mleader = result[0] if isinstance(result, tuple) else result
 
             # Helper to safely set properties
             def set_prop(obj, prop, val):
@@ -560,7 +553,10 @@ class DrawingMixin:
             if text:
                 # ContentType: 2 = MText
                 set_prop(mleader, "ContentType", 2)
-                set_prop(mleader, "TextString", text)
+                
+                # Apply Arial Font formatting using MText codes
+                formatted_text = r"{\fArial|b0|i0|c0|p34;" + text + "}"
+                set_prop(mleader, "TextString", formatted_text)
                 
                 # Attempt to set text height if possible
                 try:
@@ -581,86 +577,68 @@ class DrawingMixin:
             except Exception as e:
                 logger.warning(f"Could not set arrow style '{arrow_style}': {e}")
 
-            # If there are additional leader groups, add them
+            # Force update to ensure geometry is calculated
+            try:
+                mleader.Update()
+            except: pass
+
+            # Handle additional leader groups using _MLEADEREDIT command
             if len(leader_groups) > 1:
-                for i, group in enumerate(leader_groups[1:], 1):
-                    normalized_group = [CADInterface.normalize_coordinate(p) for p in group]
-                    variant_group = self._points_to_variant_array(normalized_group)
-                    mleader.AddLeaderLine(variant_group)
+                try:
+                    # Force Regen to ensure handle is recognized
+                    try:
+                        self.document.Regen(1) # acAllViewports = 1
+                    except: pass
+
+                    # Construct the command string
+                    # Syntax: _AIMLEADEREDITADD (handent "HANDLE") PT1 PT2 ... \x1B
+                    cmd_parts = [f'_AIMLEADEREDITADD (handent "{mleader.Handle}")']
+                    
+                    for group in leader_groups[1:]:
+                        normalized_group = [CADInterface.normalize_coordinate(p) for p in group]
+                        
+                        # Arrow point is the FIRST point in the group (from input)
+                        # We need to format it as "X,Y,Z"
+                        arrow_pt = normalized_group[0] 
+                        pt_str = f"{arrow_pt[0]},{arrow_pt[1]},{arrow_pt[2]}"
+                        
+                        cmd_parts.append(pt_str)
+                    
+                    # Terminate command with ESC
+                    cmd_parts.append('\x1B')
+                    
+                    full_cmd = " ".join(cmd_parts)
+                    logger.info(f"Adding {len(leader_groups)-1} extra arrows via command: {full_cmd}")
+                    
+                    self.document.SendCommand(full_cmd)
+                    
+                except Exception as e:
+                    logger.error(f"Failed to add extra arrows via command: {e}")
+
+            # Match color (moved here to ensure it applies to the whole entity)
+            if isinstance(color, int):
+                try:
+                    # Try direct assignment first (ZWCAD simple property)
+                    mleader.Color = color
+                except:
+                    try:
+                        # Try via ColorIndex property (AutoCAD/Complex property)
+                        mleader.Color.ColorIndex = color
+                    except Exception as e:
+                        logger.warning(f"Could not set MLeader color: {e}")
 
             # Force update
             try:
                 mleader.Update()
             except: pass
 
-            # Apply properties
-            self._apply_properties(mleader, layer, color)
-            self._track_entity(mleader, "mleader")
-
-            if not _skip_refresh:
-                self.refresh_view()
-
-            logger.debug(
-                f"Drew multi-leader with {len(leader_groups)} lines "
-                f"(arrow_style={arrow_style}, text={text})"
+            return self._finalize_entity(
+                mleader, layer, color, 0, "mleader", _skip_refresh,
+                f"Drew multi-leader with {len(leader_groups)} lines (arrow_style={arrow_style}, text={text})"
             )
-            return str(mleader.Handle)
 
         except Exception as e:
-            import traceback
-            logger.warning(f"AddMLeader workflow failed, stepping back to AddLeader compatibility mode. Error: {e}")
-            logger.debug(traceback.format_exc())
-            
-            # Fallback: Use AddLeader (classic style)
-            
-            # Create annotation object if text is present
-            annotation_obj = None
-            if text:
-                try:
-                    width = max(text_height * 2, text_height * len(text) * 0.6)
-                    annotation_obj = document.ModelSpace.AddMText(base_array, width, text)
-                    annotation_obj.Height = text_height
-                except Exception as text_err:
-                     logger.error(f"Failed to create MText for fallback leader: {text_err}")
-                     annotation_obj = None
-            else:
-                # Try creating empty MText for strict requirements
-                try:
-                     annotation_obj = document.ModelSpace.AddMText(base_array, text_height * 2, " ")
-                     annotation_obj.Height = text_height
-                except:
-                     annotation_obj = None
+            logger.error(f"Failed to create MLeader: {e}")
+            raise CADOperationError("draw_mleader", f"Failed to create MLeader: {e}")
 
-            # Identify leader type based on arrow style
-            # 1 = acLineWithArrow, 0 = acLineNoArrow
-            leader_type = 1 
-            if arrow_style == "_NONE":
-                leader_type = 0
-            
-            handles = []
-            
-            # Create individual leaders for each group
-            for group in leader_groups:
-                normalized_group = [CADInterface.normalize_coordinate(p) for p in group]
-                variant_group = self._points_to_variant_array(normalized_group)
-                
-                try:
-                    # Note: AddLeader(PointsArray, Annotation, Type)
-                    leader = document.ModelSpace.AddLeader(
-                        variant_group, annotation_obj, leader_type
-                    )
-                    self._apply_properties(leader, layer, color)
-                    self._track_entity(leader, "leader")
-                    handles.append(str(leader.Handle))
-                except Exception as le:
-                    logger.error(f"Failed to create individual leader line: {le}")
-            
-            if not _skip_refresh:
-                self.refresh_view()
-                
-            if annotation_obj:
-                return str(annotation_obj.Handle)
-            elif handles:
-                return handles[0]
-            else:
-                raise RuntimeError(f"Failed to create any leader entities. Original error: {e}") from e
+

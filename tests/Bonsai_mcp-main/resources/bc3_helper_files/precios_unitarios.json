@@ -1,0 +1,164 @@
+{
+  "prices": [
+    {
+      "code": "ESTR001",
+      "ifc_class": "IfcBeam",
+      "description": "Viga estructural",
+      "long_description": "Elemento de viga estructural en hormigón, acero o madera. Incluye encofrado, armadura y vertido de hormigón.",
+      "unit": "m",
+      "unit_price": 150.00
+    },
+    {
+      "code": "ESTR002",
+      "ifc_class": "IfcColumn",
+      "description": "Pilar estructural",
+      "long_description": "Elemento de pilar estructural en hormigón, acero o mixto. Incluye encofrado, armadura, hormigón y acabados.",
+      "unit": "m",
+      "unit_price": 180.00
+    },
+    {
+      "code": "ESTR003",
+      "ifc_class": "IfcFooting",
+      "description": "Zapata de cimentación",
+      "long_description": "Elemento de zapata de cimentación. Incluye excavación, hormigón de limpieza, armadura, hormigón e impermeabilización.",
+      "unit": "m3",
+      "unit_price": 120.00
+    },
+    {
+      "code": "ESTR004",
+      "ifc_class": "IfcPile",
+      "description": "Pilote de cimentación",
+      "long_description": "Elemento de pilote de cimentación profunda. Incluye perforación, jaula de armado y relleno de hormigón.",
+      "unit": "m",
+      "unit_price": 200.00
+    },
+    {
+      "code": "ESTR005",
+      "ifc_class": "IfcRamp",
+      "description": "Rampa de accesibilidad",
+      "long_description": "Estructura de rampa de accesibilidad. Incluye base de hormigón, armadura, acabado superficial y barandillas.",
+      "unit": "m2",
+      "unit_price": 140.00
+    },
+    {
+      "code": "ESTR006",
+      "ifc_class": "IfcStair",
+      "description": "Escalera estructural",
+      "long_description": "Unidad de escalera incluyendo estructura, peldaños, tabicas, barandillas y acabados superficiales.",
+      "unit": "ud",
+      "unit_price": 160.00
+    },
+    {
+      "code": "ALB001",
+      "ifc_class": "IfcWall",
+      "description": "Muro de albañilería",
+      "long_description": "Construcción de muro de albañilería. Incluye fábrica de ladrillo o bloque, mortero, aislamiento y enfoscado a ambas caras.",
+      "unit": "m2",
+      "unit_price": 85.00
+    },
+    {
+      "code": "ALB002",
+      "ifc_class": "IfcWallStandardCase",
+      "description": "Muro estándar de albañilería",
+      "long_description": "Muro de albañilería con capas estándar. Incluye bloques estructurales, aislamiento térmico y acabados interior/exterior.",
+      "unit": "m2",
+      "unit_price": 90.00
+    },
+    {
+      "code": "FORG001",
+      "ifc_class": "IfcSlab",
+      "description": "Forjado de hormigón",
+      "long_description": "Construcción de forjado de hormigón. Incluye encofrado, malla de armado, vertido de hormigón y acabado superficial.",
+      "unit": "m3",
+      "unit_price": 110.00
+    },
+    {
+      "code": "FORG002",
+      "ifc_class": "IfcRoof",
+      "description": "Cubierta",
+      "long_description": "Sistema de estructura y cobertura de cubierta. Incluye capa estructural, aislamiento térmico, membrana impermeabilizante y capa de protección.",
+      "unit": "m2",
+      "unit_price": 130.00
+    },
+    {
+      "code": "FORG003",
+      "ifc_class": "IfcCovering",
+      "description": "Revestimiento",
+      "long_description": "Instalación de revestimiento de suelo o techo. Incluye preparación de base, adhesivo, material de revestimiento y juntas de acabado.",
+      "unit": "m2",
+      "unit_price": 95.00
+    },
+    {
+      "code": "CARP001",
+      "ifc_class": "IfcDoor",
+      "description": "Puerta de carpintería",
+      "long_description": "Unidad de puerta incluyendo marco, hoja, bisagras, cerradura, manillas y acabados. Instalación y ajuste incluidos.",
+      "unit": "ud",
+      "unit_price": 250.00
+    },
+    {
+      "code": "CARP002",
+      "ifc_class": "IfcWindow",
+      "description": "Ventana de carpintería",
+      "long_description": "Unidad de ventana con marco, acristalamiento, mecanismo de apertura, burletes y herrajes. Instalación y sellado incluidos.",
+      "unit": "ud",
+      "unit_price": 300.00
+    },
+    {
+      "code": "INST001",
+      "ifc_class": "IfcFlowSegment",
+      "description": "Tramo de instalación",
+      "long_description": "Segmento de tubería o conducto para sistemas de distribución de fluidos. Incluye material, accesorios, soportes e instalación.",
+      "unit": "m",
+      "unit_price": 75.00
+    },
+    {
+      "code": "INST002",
+      "ifc_class": "IfcFlowFitting",
+      "description": "Accesorio de instalación",
+      "long_description": "Elemento de accesorio de tubería o conducto (codo, te, reducción, etc.). Incluye material, juntas e instalación.",
+      "unit": "ud",
+      "unit_price": 60.00
+    },
+    {
+      "code": "INST003",
+      "ifc_class": "IfcFlowTerminal",
+      "description": "Terminal de instalación",
+      "long_description": "Dispositivo terminal para sistemas de climatización o fontanería (difusor, salida, grifo, etc.). Incluye dispositivo, conexiones y puesta en marcha.",
+      "unit": "ud",
+      "unit_price": 80.00
+    },
+    {
+      "code": "INST004",
+      "ifc_class": "IfcDistributionElement",
+      "description": "Elemento de distribución",
+      "long_description": "Elemento general de sistema de distribución. Incluye componente, accesorios, soportes y trabajos de instalación.",
+      "unit": "ud",
+      "unit_price": 70.00
+    },
+    {
+      "code": "INST005",
+      "ifc_class": "IfcRailing",
+      "description": "Barandilla",
+      "long_description": "Sistema de barandilla o guarda. Incluye postes, pasamanos, paneles de relleno, anclajes y tratamiento superficial.",
+      "unit": "m",
+      "unit_price": 100.00
+    },
+    {
+      "code": "MOB001",
+      "ifc_class": "IfcFurnishingElement",
+      "description": "Elemento de mobiliario",
+      "long_description": "Elemento de mobiliario fijo. Incluye fabricación, acabados, herrajes, entrega e instalación.",
+      "unit": "ud",
+      "unit_price": 120.00
+    },
+    {
+      "code": "MOB002",
+      "ifc_class": "IfcFurniture",
+      "description": "Mueble",
+      "long_description": "Unidad o pieza de mobiliario. Incluye producto, montaje, ajuste y colocación en posición final.",
+      "unit": "ud",
+      "unit_price": 150.00
+    }
+  ]
+}

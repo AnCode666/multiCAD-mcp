@@ -19,7 +19,7 @@ import json
 import logging
 from typing import Optional, Dict, Any, Callable, List, Tuple
 
-from mcp.server.fastmcp import Context
+
 from pydantic import ValidationError
 
 from core.models import CreateLayerRequest
@@ -186,9 +186,7 @@ def register_layer_tools(mcp):
 
     @cad_tool(mcp, "manage_layers")
     def manage_layers(
-        ctx: Context,
         operations: str,
-        cad_type: Optional[str] = None,
     ) -> str:
         """
         Manage layers: create, modify, query, or change visibility.
@@ -216,7 +214,7 @@ def register_layer_tools(mcp):
 
                 JSON format also supported for backwards compatibility.
 
-            cad_type: CAD application to use
+
 
         Returns:
             JSON result with per-operation status

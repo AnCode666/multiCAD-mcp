@@ -576,39 +576,10 @@ class ExportMixin:
             perf_start_setup = time.perf_counter()
             config = get_config()
 
-            # SECURITY: Resolve output directory first (reference for validation)
-            output_dir = Path(config.output.directory).expanduser().resolve()
-
-            # ========== Determine Directory (filepath) ==========
-            if filepath:
-                # If filepath provided, extract directory part
-                dir_part = str(Path(filepath).parent)
-                if dir_part and dir_part != ".":
-                    export_dir = dir_part
-                else:
-                    export_dir = str(output_dir)
-            else:
-                export_dir = str(output_dir)
-
-            # Convert to absolute path (required by security validation)
-            export_dir_path = Path(export_dir).expanduser().resolve()
-
-            # SECURITY: Verify the directory is within the configured output directory
-            try:
-                export_dir_path.relative_to(output_dir)
-            except ValueError:
-                logger.error(
-                    f"Security: Attempted to export outside output directory. "
-                    f"Requested: {export_dir_path}, Allowed: {output_dir}"
-                )
-                return False
-
-            # Create directory if it doesn't exist
-            export_dir_path.mkdir(parents=True, exist_ok=True)
-
-            # Get filename and construct full path
+            # Resolve final path using centralized utility
             filename = Path(filepath).name if filepath else "drawing_data.xlsx"
-            full_filepath = export_dir_path / filename
+            full_filepath_str = self.resolve_export_path(filename, "sheets")
+            full_filepath = Path(full_filepath_str)
 
             perf_setup_time = time.perf_counter() - perf_start_setup
             logger.info(f"[PERF] Export setup took {perf_setup_time:.3f}s")

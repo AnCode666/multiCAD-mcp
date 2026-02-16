@@ -1,0 +1,36 @@
+{
+  "element_categories": {
+    "ESTR": [
+      "IfcBeam",
+      "IfcColumn",
+      "IfcFooting",
+      "IfcPile",
+      "IfcRamp",
+      "IfcStair"
+    ],
+    "ALB": [
+      "IfcWall",
+      "IfcWallStandardCase"
+    ],
+    "FORG": [
+      "IfcSlab",
+      "IfcRoof",
+      "IfcCovering"
+    ],
+    "CARP": [
+      "IfcDoor",
+      "IfcWindow"
+    ],
+    "INST": [
+      "IfcFlowSegment",
+      "IfcFlowFitting",
+      "IfcFlowTerminal",
+      "IfcDistributionElement",
+      "IfcRailing"
+    ],
+    "MOB": [
+      "IfcFurnishingElement",
+      "IfcFurniture"
+    ]
+  }
+}

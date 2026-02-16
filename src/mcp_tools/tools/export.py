@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from mcp.server.fastmcp import Context
+
 
 from mcp_tools.decorators import cad_tool, get_current_adapter
 
@@ -160,11 +160,9 @@ def register_export_tools(mcp):
 
     @cad_tool(mcp, "export_data")
     def export_data(
-        ctx: Context,
         scope: str = "all",
         format: str = "json",
         filename: str = "drawing_data.xlsx",
-        cad_type: Optional[str] = None,
     ) -> str:
         """
         Extract or export drawing data.
@@ -179,7 +177,7 @@ def register_export_tools(mcp):
             filename: Excel filename (only used when format="excel").
                       Default: "drawing_data.xlsx"
                       Saved to the configured output directory.
-            cad_type: CAD application to use
+
 
         Returns:
             JSON result with entity data or export status

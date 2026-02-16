@@ -19,7 +19,7 @@ import json
 import logging
 from typing import Optional, Dict, Any, Callable, List, Tuple
 
-from mcp.server.fastmcp import Context
+
 from pydantic import ValidationError
 
 from core.models import (
@@ -233,9 +233,7 @@ def register_entity_tools(mcp):
 
     @cad_tool(mcp, "manage_entities")
     def manage_entities(
-        ctx: Context,
         operations: str,
-        cad_type: Optional[str] = None,
     ) -> str:
         """
         Manage entities: select, transform, restyle, copy/paste.
@@ -264,7 +262,7 @@ def register_entity_tools(mcp):
 
                 JSON format also supported for backwards compatibility.
 
-            cad_type: CAD application to use
+
 
         Returns:
             JSON result with per-operation status

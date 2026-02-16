@@ -1,0 +1,97 @@
+{
+  "title": "Technical Report – Basic Building Project",
+  "children": {
+    "1": {
+      "title": "Introduction",
+      "children": {
+        "1.1": "Project objective",
+        "1.2": "Documentation scope",
+        "1.3": "Background and justification"
+      }
+    },
+    "2": {
+      "title": "General Building Data",
+      "children": {
+        "2.1": "Location and site",
+        "2.2": "Building intended use",
+        "2.3": "Built and usable area (per floor)",
+        "2.4": "Capacity (users, dwellings, premises, etc.)",
+        "2.5": "Urban planning and technical regulations applicable"
+      }
+    },
+    "3": {
+      "title": "Environmental Conditions",
+      "children": {
+        "3.1": "Site description",
+        "3.2": "Urban environment and access",
+        "3.3": "Topographic and climatic conditions"
+      }
+    },
+    "4": {
+      "title": "Architectural Solution",
+      "children": {
+        "4.1": "General design criteria",
+        "4.2": "Functional distribution and space organization",
+        "4.3": "Facade and volumetric description",
+        "4.4": "Accessibility and evacuation"
+      }
+    },
+    "5": {
+      "title": "Planned Construction Systems",
+      "children": {
+        "5.1": "Structure (type and main material)",
+        "5.2": "Foundation (adopted criteria)",
+        "5.3": "External enclosures",
+        "5.4": "Roofs and carpentry",
+        "5.5": "Main interior finishes"
+      }
+    },
+    "6": {
+      "title": "General Installations",
+      "children": {
+        "6.1": "Water supply and drainage",
+        "6.2": "Electricity and telecommunications",
+        "6.3": "Air conditioning and ventilation (if applicable)",
+        "6.4": "Fire protection (basic criteria)",
+        "6.5": "Renewable energy (if applicable)"
+      }
+    },
+    "7": {
+      "title": "Safety and Health",
+      "children": {
+        "7.1": "Main risk identification",
+        "7.2": "Safety criteria adopted"
+      }
+    },
+    "8": {
+      "title": "Regulatory Compliance",
+      "children": {
+        "8.1": "Urban planning regulations",
+        "8.2": "Habitability and accessibility regulations",
+        "8.3": "Fire safety regulations",
+        "8.4": "Energy efficiency regulations"
+      }
+    },
+    "9": {
+      "title": "Areas and Area Schedule",
+      "children": {
+        "9.1": "Summary table of built and usable areas",
+        "9.2": "Occupancy and buildability ratios"
+      }
+    },
+    "10": {
+      "title": "Conclusions",
+      "children": {
+        "10.1": "Justification of the adopted solution",
+        "10.2": "Adaptation to environment and regulations"
+      }
+    },
+    "11": {
+      "title": "Annexes",
+      "children": {
+        "11.1": "Basic project plans",
+        "11.2": "Complementary documentation (if applicable)"
+      }
+    }
+  }
+}

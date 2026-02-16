@@ -8,7 +8,7 @@ AI assistant guidance for working with the multiCAD-mcp codebase.
 
 **Stack**: Python 3.10+ | FastMCP 2.0 | pywin32 | Windows-only
 
-**Version**: 0.1.2 (in `src/__version__.py`)
+**Version**: 0.1.3 (in `src/__version__.py`)
 
 ---
 
@@ -39,7 +39,7 @@ black src/ && mypy src/
 2. **Core** (`src/core/`) - Interfaces, config, exceptions
 3. **Adapters** (`src/adapters/`) - Mixin-based universal adapter
 
-**Mixin Architecture** (v0.1.2+):
+**Mixin Architecture** (v0.1.3+):
 
 ```
 adapters/
@@ -73,7 +73,7 @@ adapter = AutoCADAdapter("autocad")  # or "zwcad", "gcad", "bricscad"
 multiCAD-mcp/
 ├── src/
 │   ├── server.py              # Entry point
-│   ├── __version__.py         # Version: 0.1.2
+│   ├── __version__.py         # Version: 0.1.3
 │   ├── config.json            # Configuration
 │   ├── core/                  # Interfaces, config, exceptions
 │   ├── adapters/              # Mixin-based adapter + manager
@@ -216,4 +216,4 @@ git commit -m "fix(adapter): description"
 
 ---
 
-**Version**: 0.1.2 | **Commands**: 54 | **Unified Tools**: 7
+**Version**: 0.1.3 | **Commands**: 54 | **Unified Tools**: 7

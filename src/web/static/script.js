@@ -1,232 +1,363 @@
-// Dashboard State
-let activeTab = 'overview';
+// ========================
+// multiCAD-MCP Dashboard
+// ========================
+
+// State
 let cadStatus = { connected: false, cad_type: 'None', drawings: [], current_drawing: 'None' };
 let layers = [];
 let blocks = [];
+let entities = [];
 
-// DOM Elements
+// DOM refs
 const navButtons = document.querySelectorAll('.nav-btn');
-const tabContents = document.querySelectorAll('.tab-content');
 const connectionIndicator = document.querySelector('.status-indicator');
 const connectionText = document.querySelector('.status-text');
-const cadTypeDisplay = document.getElementById('cad-type-display');
-const drawingsCount = document.getElementById('drawings-count');
-const currentDrawingName = document.getElementById('current-drawing-name');
-const currentDrawingPath = document.getElementById('current-drawing-path');
 const refreshBtn = document.getElementById('refresh-all');
+const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
 
-// Initialize
+// Refresh management
+let refreshInterval = null;
+
+function manageAutoRefresh() {
+    if (autoRefreshToggle && autoRefreshToggle.checked) {
+        if (!refreshInterval) {
+            refreshInterval = setInterval(refreshData, 15000);
+        }
+    } else {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+    }
+}
+
+// Init
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     refreshData();
-    // Auto-refresh every 10 seconds
-    setInterval(refreshData, 10000);
+    manageAutoRefresh();
 });
 
 function setupEventListeners() {
-    // Tab Switching
+    // Sidebar nav — scroll to section
     navButtons.forEach(btn => {
         btn.addEventListener('click', () => {
-            const tabId = btn.getAttribute('data-tab');
-            switchTab(tabId);
+            const tab = btn.getAttribute('data-tab');
+            handleNavClick(tab);
+
+            // Highlight active
+            document.querySelectorAll('.nav-item').forEach(li => li.classList.remove('active'));
+            btn.parentElement.classList.add('active');
         });
     });
 
-    // Refresh button
-    refreshBtn.addEventListener('click', refreshData);
+    // Refresh
+    refreshBtn?.addEventListener('click', handleManualRefresh);
+    autoRefreshToggle?.addEventListener('change', manageAutoRefresh);
 
     // Filters
-    document.getElementById('filter-layers').addEventListener('input', (e) => {
-        renderLayersTable(e.target.value);
-    });
+    document.getElementById('filter-entities')?.addEventListener('input', renderEntities);
+    document.getElementById('filter-entities-layer')?.addEventListener('change', renderEntities);
+    document.getElementById('filter-layers')?.addEventListener('input', renderLayers);
+    document.getElementById('filter-blocks')?.addEventListener('input', renderBlocks);
 
-    document.getElementById('filter-blocks').addEventListener('input', (e) => {
-        renderBlocksGrid(e.target.value);
-    });
+    // Accordions
+    document.getElementById('expand-all-entities')?.addEventListener('click', () => toggleAllAccordions('entities-container', true));
+    document.getElementById('collapse-all-entities')?.addEventListener('click', () => toggleAllAccordions('entities-container', false));
+    document.getElementById('expand-all-layers')?.addEventListener('click', () => toggleAllAccordions('layers-container', true));
+    document.getElementById('collapse-all-layers')?.addEventListener('click', () => toggleAllAccordions('layers-container', false));
+    document.getElementById('expand-all-blocks')?.addEventListener('click', () => toggleAllAccordions('blocks-container', true));
+    document.getElementById('collapse-all-blocks')?.addEventListener('click', () => toggleAllAccordions('blocks-container', false));
 }
 
-function switchTab(tabId) {
-    activeTab = tabId;
+function handleNavClick(tab) {
+    const logsSection = document.getElementById('logs-section');
 
-    // Update active button
-    navButtons.forEach(btn => {
-        if (btn.getAttribute('data-tab') === tabId) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-
-    // Update active content
-    tabContents.forEach(content => {
-        if (content.id === `tab-${tabId}`) {
-            content.classList.add('active');
-        } else {
-            content.classList.remove('active');
-        }
-    });
-
-    addLog(`Cambiado a pestaña: ${tabId}`, 'system');
+    if (tab === 'logs') {
+        if (logsSection) logsSection.style.display = 'block';
+        logsSection?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tab === 'entities') {
+        if (logsSection) logsSection.style.display = 'none';
+        document.getElementById('entities-container')?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tab === 'layers') {
+        if (logsSection) logsSection.style.display = 'none';
+        document.getElementById('layers-container')?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tab === 'blocks') {
+        if (logsSection) logsSection.style.display = 'none';
+        document.getElementById('blocks-container')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        // overview — scroll to top
+        if (logsSection) logsSection.style.display = 'none';
+        document.querySelector('.content-area')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
 
-async function refreshData() {
-    addLog('Refrescando datos...', 'system');
+async function handleManualRefresh() {
+    if (!refreshBtn || refreshBtn.classList.contains('loading')) return;
+
+    refreshBtn.classList.add('loading');
+    const btnText = refreshBtn.querySelector('.btn-text');
+    const orig = btnText ? btnText.textContent : 'Refrescar';
+    if (btnText) btnText.textContent = 'Refrescando...';
 
     try {
-        await Promise.all([
-            fetchStatus(),
-            fetchLayers(),
-            fetchBlocks()
+        const res = await fetch('/api/cad/refresh', { method: 'POST' });
+        const result = await res.json();
+        if (result.success) {
+            await refreshData();
+            showToast('✅ Datos actualizados', 'success');
+        } else {
+            showToast('❌ Error de refresco', 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de conexión', 'error');
+    } finally {
+        setTimeout(() => {
+            refreshBtn.classList.remove('loading');
+            if (btnText) btnText.textContent = orig;
+        }, 300);
+    }
+}
+
+// ========================
+// Data
+// ========================
+
+async function refreshData() {
+    try {
+        const res = await fetch('/api/cad/status');
+        const data = await res.json();
+        if (data.success) {
+            cadStatus = data.status;
+            if (cadStatus.connected) {
+                await fetchDetails();
+            } else {
+                layers = []; blocks = []; entities = [];
+            }
+            updateUI();
+        }
+    } catch (err) {
+        console.error('Refresh error:', err);
+    }
+}
+
+async function fetchDetails() {
+    try {
+        const [lR, bR, eR] = await Promise.all([
+            fetch('/api/cad/layers'),
+            fetch('/api/cad/blocks'),
+            fetch('/api/cad/entities')
         ]);
-
-        updateUI();
-        addLog('Datos actualizados correctamente.', 'info');
-    } catch (error) {
-        console.error('Error refreshing data:', error);
-        addLog(`Error al refrescar: ${error.message}`, 'error');
-        showToast('Error al conectar con el servidor', 'error');
+        const [lD, bD, eD] = await Promise.all([lR.json(), bR.json(), eR.json()]);
+        layers = lD.success ? lD.layers : [];
+        blocks = bD.success ? bD.blocks : [];
+        entities = eD.success ? eD.entities : [];
+    } catch (err) {
+        console.error('Details error:', err);
     }
 }
 
-async function fetchStatus() {
-    const response = await fetch('/api/cad/status');
-    cadStatus = await response.json();
-}
-
-async function fetchLayers() {
-    const response = await fetch('/api/cad/layers');
-    const result = await response.json();
-    if (result.success) {
-        layers = result.layers;
-        document.getElementById('total-layers-count').textContent = layers.length;
-    }
-}
-
-async function fetchBlocks() {
-    const response = await fetch('/api/cad/blocks');
-    const result = await response.json();
-    if (result.success && result.blocks) {
-        blocks = result.blocks;
-        document.getElementById('total-blocks-count').textContent = blocks.length;
-    }
-}
+// ========================
+// UI
+// ========================
 
 function updateUI() {
-    // Update Connection Stats
-    if (cadStatus.connected) {
-        connectionIndicator.className = 'status-indicator green';
-        connectionText.textContent = `Conectado a ${cadStatus.cad_type}`;
-        cadTypeDisplay.textContent = cadStatus.cad_type;
-        drawingsCount.textContent = cadStatus.drawings.length;
-        currentDrawingName.textContent = cadStatus.current_drawing;
-        currentDrawingPath.textContent = 'Activo';
-    } else {
-        connectionIndicator.className = 'status-indicator red';
-        connectionText.textContent = 'Desconectado';
-        cadTypeDisplay.textContent = 'Ninguno';
-        drawingsCount.textContent = '0';
-        currentDrawingName.textContent = 'No hay dibujos activos';
-        currentDrawingPath.textContent = 'Conéctate a través de MCP';
-    }
+    const c = cadStatus.connected;
 
-    // Render components
-    renderLayersTable();
-    renderBlocksGrid();
+    // Sidebar status
+    if (connectionIndicator) connectionIndicator.className = `status-indicator ${c ? 'green' : 'red'}`;
+    if (connectionText) connectionText.textContent = c ? 'Conectado' : 'Desconectado';
+
+    // Stat cards
+    const cadType = document.getElementById('cad-type-display');
+    const drawShort = document.getElementById('current-drawing-name-short');
+    const entCount = document.getElementById('entities-count');
+    if (cadType) cadType.textContent = cadStatus.cad_type || 'Ninguno';
+    if (drawShort) drawShort.textContent = cadStatus.current_drawing || 'Ninguno';
+    if (entCount) entCount.textContent = entities.length;
+
+    // Drawing card
+    const drawName = document.getElementById('current-drawing-name');
+    const drawPath = document.getElementById('current-drawing-path');
+    if (drawName) drawName.textContent = c ? (cadStatus.current_drawing || 'Sin dibujo') : 'Esperando conexión...';
+    if (drawPath) drawPath.textContent = c ? 'Documento activo' : 'Conecta a ZWCAD a través de MCP';
+
+    // Badges
+    const layBadge = document.getElementById('total-layers-count');
+    const blkBadge = document.getElementById('total-blocks-count');
+    if (layBadge) layBadge.textContent = layers.length;
+    if (blkBadge) blkBadge.textContent = blocks.length;
+
+    populateLayerFilter();
+    renderEntities();
+    renderLayers();
+    renderBlocks();
 }
 
-function renderLayersTable(filter = '') {
-    const tbody = document.querySelector('#layers-table tbody');
-    tbody.innerHTML = '';
+function populateLayerFilter() {
+    const sel = document.getElementById('filter-entities-layer');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todas las capas</option>';
+    [...new Set(entities.map(e => e.Layer).filter(Boolean))].sort().forEach(n => {
+        const o = document.createElement('option');
+        o.value = n; o.textContent = n;
+        sel.appendChild(o);
+    });
+    sel.value = cur;
+}
 
-    const sortedLayers = layers.filter(l =>
-        l.Name.toLowerCase().includes(filter.toLowerCase())
+// ========================
+// Renderers
+// ========================
+
+function renderEntities() {
+    const container = document.getElementById('entities-container');
+    if (!container) return;
+
+    const ft = (document.getElementById('filter-entities')?.value || '').toLowerCase();
+    const fl = document.getElementById('filter-entities-layer')?.value || '';
+
+    let filtered = entities;
+    if (ft) filtered = filtered.filter(e =>
+        (e.Handle || '').toLowerCase().includes(ft) || (e.ObjectType || '').toLowerCase().includes(ft) ||
+        (e.Layer || '').toLowerCase().includes(ft) || (e.Name || '').toLowerCase().includes(ft)
     );
+    if (fl) filtered = filtered.filter(e => e.Layer === fl);
 
-    if (sortedLayers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No se encontraron capas</td></tr>';
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay entidades disponibles</div>';
         return;
     }
 
-    sortedLayers.forEach(layer => {
-        const row = document.createElement('tr');
+    const groups = {};
+    filtered.forEach(e => { const t = e.ObjectType || '?'; if (!groups[t]) groups[t] = []; groups[t].push(e); });
 
-        // Color bubble
-        const colorStyle = `background-color: ${getColorHex(layer.Color)}`;
-
-        row.innerHTML = `
-            <td><span class="layer-name" style="font-weight: 600;">${layer.Name}</span></td>
-            <td><span class="color-preview" style="${colorStyle}"></span> ${layer.Color}</td>
-            <td>
-                <span class="badge ${layer.IsVisible ? 'visible' : 'hidden'}">
-                    ${layer.IsVisible ? '👁️ Visible' : '🌑 Oculta'}
-                </span>
-                ${layer.IsLocked ? '🔒 Bloqueada' : ''}
-            </td>
-            <td>${layer.ObjectCount}</td>
-        `;
-        tbody.appendChild(row);
-    });
-}
-
-function renderBlocksGrid(filter = '') {
-    const container = document.getElementById('blocks-container');
     container.innerHTML = '';
-
-    const filteredBlocks = blocks.filter(b =>
-        b.Name.toLowerCase().includes(filter.toLowerCase())
-    );
-
-    if (filteredBlocks.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="grid-column: 1/-1">No se encontraron bloques</div>';
-        return;
-    }
-
-    filteredBlocks.forEach(block => {
-        const card = document.createElement('div');
-        card.className = 'block-card';
-        card.innerHTML = `
-            <span class="block-name">${block.Name}</span>
-            <div class="block-count">
-                ${block.ReferenceCount} instancias | ${block.ObjectCount} entidades
-            </div>
-        `;
-        container.appendChild(card);
+    Object.keys(groups).sort().forEach(type => {
+        const items = groups[type];
+        container.appendChild(createAccordionSection(`🔹 ${type}`, `${items.length}`, makeEntityTable(items)));
     });
 }
 
-function addLog(message, type = 'info') {
-    const consoleOutput = document.getElementById('console-output');
-    const entry = document.createElement('div');
-    const timestamp = new Date().toLocaleTimeString();
-    entry.className = `log-entry ${type}`;
-    entry.textContent = `[${timestamp}] ${message}`;
-
-    consoleOutput.appendChild(entry);
-    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+function makeEntityTable(items) {
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>Handle</th><th>Capa</th><th>Color</th><th>Longitud</th><th>Área</th></tr></thead><tbody></tbody>';
+    const tb = t.querySelector('tbody');
+    items.forEach(e => {
+        const r = document.createElement('tr');
+        const ch = getColorHex(e.Color);
+        r.innerHTML = `<td class="mono">${esc(e.Handle || '')}</td><td>${esc(e.Layer || '')}</td><td><span class="color-preview" style="background-color:${ch}"></span> ${esc(String(e.Color || ''))}</td><td class="num">${fmtNum(e.Length)}</td><td class="num">${fmtNum(e.Area)}</td>`;
+        tb.appendChild(r);
+    });
+    return t;
 }
 
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('message-box');
-    toast.textContent = message;
-    toast.style.display = 'block';
-    toast.style.backgroundColor = type === 'success' ? '#10b981' : '#ef4444';
+function renderLayers() {
+    const container = document.getElementById('layers-container');
+    if (!container) return;
+    const ft = (document.getElementById('filter-layers')?.value || '').toLowerCase();
+    const filtered = layers.filter(l => l.Name.toLowerCase().includes(ft));
 
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 3000);
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay datos de capas disponibles</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>Capa</th><th>Color</th><th>Estado</th><th>Entidades</th></tr></thead><tbody></tbody>';
+    const tb = t.querySelector('tbody');
+    filtered.forEach(l => {
+        const r = document.createElement('tr');
+        const ch = getColorHex(l.Color);
+        r.innerHTML = `<td><strong>${esc(l.Name)}</strong></td><td><span class="color-preview" style="background-color:${ch}"></span> ${esc(String(l.Color || ''))}</td><td><span class="badge ${l.On ? 'visible' : 'hidden'}">${l.On ? 'Visible' : 'Oculta'}</span></td><td class="num">${l.ObjectCount || 0}</td>`;
+        tb.appendChild(r);
+    });
+    container.appendChild(t);
 }
 
-// Utility to convert common CAD colors to HEX
+function renderBlocks() {
+    const container = document.getElementById('blocks-container');
+    if (!container) return;
+    const ft = (document.getElementById('filter-blocks')?.value || '').toLowerCase();
+    const filtered = blocks.filter(b => b.Name.toLowerCase().includes(ft));
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state">No hay bloques disponibles</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach(b => {
+        const body = document.createElement('div');
+        body.className = 'block-detail';
+        body.innerHTML = `<div><strong>Instancias:</strong> ${b.Count || 0} · <strong>Entidades:</strong> ${b.ObjectCount || 0}</div>`;
+        container.appendChild(createAccordionSection(`📦 ${b.Name}`, `${b.Count || 0}`, body));
+    });
+}
+
+// ========================
+// Components
+// ========================
+
+function createAccordionSection(title, badge, contentEl) {
+    const s = document.createElement('div');
+    s.className = 'accordion-section';
+    const h = document.createElement('div');
+    h.className = 'accordion-header';
+    h.innerHTML = `<span class="accordion-arrow">▶</span><span class="accordion-title">${title}</span><span class="accordion-badge">${badge}</span>`;
+    const b = document.createElement('div');
+    b.className = 'accordion-body';
+    b.appendChild(contentEl);
+    h.addEventListener('click', () => { h.classList.toggle('open'); b.classList.toggle('open'); });
+    s.appendChild(h);
+    s.appendChild(b);
+    return s;
+}
+
+function toggleAllAccordions(id, expand) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    c.querySelectorAll('.accordion-header').forEach(h => h.classList.toggle('open', expand));
+    c.querySelectorAll('.accordion-body').forEach(b => b.classList.toggle('open', expand));
+}
+
+// ========================
+// Utils
+// ========================
+
+function addLog(msg, type = 'info') {
+    const c = document.getElementById('console-output');
+    if (!c) return;
+    const e = document.createElement('div');
+    e.className = `log-entry ${type}`;
+    e.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    c.appendChild(e);
+    c.scrollTop = c.scrollHeight;
+}
+
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('message-box');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = `toast show`;
+    t.style.backgroundColor = type === 'success' ? '#10b981' : '#ef4444';
+    setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+function esc(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function fmtNum(val) {
+    if (val === null || val === undefined || isNaN(val)) return '—';
+    return Number(val).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+}
+
 function getColorHex(color) {
-    const colors = {
-        'white': '#ffffff',
-        'red': '#ff0000',
-        'yellow': '#ffff00',
-        'green': '#00ff00',
-        'cyan': '#00ffff',
-        'blue': '#0000ff',
-        'magenta': '#ff00ff',
-        'black': '#000000'
-    };
-    return colors[color.toLowerCase()] || '#94a3b8';
+    const m = { white: '#fff', red: '#f00', yellow: '#ff0', green: '#0f0', cyan: '#0ff', blue: '#00f', magenta: '#f0f', black: '#000' };
+    return m[String(color).toLowerCase()] || '#94a3b8';
 }

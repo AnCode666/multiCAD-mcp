@@ -8,7 +8,6 @@ Supports AutoCAD, ZWCAD, GstarCAD, and other COM-compatible CAD software.
 """
 
 import sys
-import webbrowser
 
 from fastmcp import FastMCP
 
@@ -97,8 +96,6 @@ if __name__ == "__main__":
     def run_dashboard():
         """Helper to run uvicorn in a thread."""
         logger.info(f"Starting dashboard on http://{host}:{port}")
-        # Open browser automatically
-        webbrowser.open(f"http://{host}:{port}")
         uvicorn.run(api_app, host=host, port=port, log_level="warning")
 
     try:
@@ -108,6 +105,30 @@ if __name__ == "__main__":
             # Start dashboard in background
             web_thread = threading.Thread(target=run_dashboard, daemon=True)
             web_thread.start()
+
+            # Start background refresher thread
+            def refresher_loop():
+                """Wait for refresh events or timeout to update the dashboard cache."""
+                from web.api import refresh_event, refresh_done_event, refresh_dashboard_cache
+                logger.debug("Refresher thread started")
+                while True:
+                    # Wait for manual refresh or 30s auto-refresh
+                    event_set = refresh_event.wait(timeout=30.0)
+                    if event_set:
+                        logger.info("Manual dashboard refresh requested via API")
+                        refresh_event.clear()
+                    
+                    try:
+                        refresh_dashboard_cache()
+                    except Exception as e:
+                        logger.error(f"Error in background cache refresh: {e}")
+                    finally:
+                        # Always signal completion if an event was waiting
+                        if event_set:
+                            refresh_done_event.set()
+
+            refresher_thread = threading.Thread(target=refresher_loop, daemon=True)
+            refresher_thread.start()
 
             # Run MCP stdio
             mcp.run(transport="stdio")
@@ -121,9 +142,6 @@ if __name__ == "__main__":
 
             logger.info(f"Access dashboard at http://{host}:{port}/")
             logger.info(f"MCP endpoint at http://{host}:{port}/mcp")
-
-            # Open browser automatically
-            webbrowser.open(f"http://{host}:{port}")
 
             uvicorn.run(app, host=host, port=port)
 

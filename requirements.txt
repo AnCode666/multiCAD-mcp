@@ -32,3 +32,5 @@ flake8>=6.0.0
 mypy>=1.0.0
 isort>=5.12.0
 
+# Image processing (for screenshots)
+Pillow>=10.0.0

@@ -18,7 +18,7 @@ import logging
 import os
 from typing import Optional, Dict, Any, Callable, List, Tuple
 
-from mcp.server.fastmcp import Context
+
 
 from core import get_config
 from mcp_tools.decorators import cad_tool, get_current_adapter
@@ -138,9 +138,7 @@ def register_file_tools(mcp):
 
     @cad_tool(mcp, "manage_files")
     def manage_files(
-        ctx: Context,
         operations: str,
-        cad_type: Optional[str] = None,
     ) -> str:
         """
         Manage drawing files with one or more operations in a single call.
@@ -165,7 +163,7 @@ def register_file_tools(mcp):
 
                 JSON format also supported for backwards compatibility.
 
-            cad_type: CAD application to use
+
 
         Returns:
             JSON result with per-operation status

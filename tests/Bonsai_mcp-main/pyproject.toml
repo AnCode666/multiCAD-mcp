@@ -1,0 +1,18 @@
+[project]
+name = "Bonsai_mcp"
+version = "0.1.0"
+description = "A minimal MCP Server to illusrate the interaction between Bonsai BIM (Blender) and Claude."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp[cli]>=1.4.1",
+    "pillow>=11.3.0",
+]
+authors = [
+    {name = "JotaDeRodriguez"}
+]
+license = {text = "MIT"}
+[project.urls]
+"Homepage" = "https://github.com/JotaDeRodriguez/Bonsai_mcp"
+"Bug Tracker" = "https://github.com/JotaDeRodriguez/Bonsai_mcp/issues"
