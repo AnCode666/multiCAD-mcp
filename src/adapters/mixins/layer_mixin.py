@@ -370,29 +370,15 @@ class LayerMixin:
 
             for handle in handles:
                 try:
-                    # Get entity by handle
+                    # Get entity by handle using HandleToObject (O(1) vs O(n) iteration)
                     try:
-                        entity = model_space.Item(model_space.Count - 1)
-                        for i in range(model_space.Count):
-                            entity = model_space.Item(i)
-                            if str(entity.Handle) == str(handle):
-                                break
-                        else:
-                            results.append(
-                                {
-                                    "handle": handle,
-                                    "success": False,
-                                    "error": "Entity not found",
-                                }
-                            )
-                            failed_count += 1
-                            continue
+                        entity = document.HandleToObject(handle)
                     except Exception as e:
                         results.append(
                             {
                                 "handle": handle,
                                 "success": False,
-                                "error": f"Failed to find entity: {e}",
+                                "error": f"Entity not found: {e}",
                             }
                         )
                         failed_count += 1
