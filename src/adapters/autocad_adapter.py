@@ -1584,6 +1584,8 @@ class AutoCADAdapter(CADInterface):
         scale_z: float = 1.0,
         rotation: float = 0.0,
         layer: str = "0",
+        color: str | int = "white",
+        attributes: Optional[Dict[str, str]] = None,
         _skip_refresh: bool = False,
     ) -> str:
         """Insert a block reference in the drawing.
@@ -1596,6 +1598,8 @@ class AutoCADAdapter(CADInterface):
             scale_z: Z scale factor (default: 1.0)
             rotation: Rotation angle in degrees (default: 0.0)
             layer: Layer to place the block on (default: "0")
+            color: Color for the block reference (default: "white")
+            attributes: Dictionary of attribute tag -> value pairs to set (optional)
             _skip_refresh: Internal flag to skip view refresh (used for batch operations)
 
         Returns:
@@ -1626,9 +1630,14 @@ class AutoCADAdapter(CADInterface):
 
             if not block_exists:
                 available_blocks = self.list_blocks()
+                block_names = [
+                    b["Name"] if isinstance(b, dict) else b
+                    for b in available_blocks
+                ]
                 raise CADOperationError(
                     "insert_block",
-                    f"Block '{block_name}' not found. Available blocks: {', '.join(available_blocks)}"
+                    f"Block '{block_name}' not found. "
+                    f"Available blocks: {', '.join(block_names)}"
                 )
 
             # Insert the block
@@ -1641,15 +1650,29 @@ class AutoCADAdapter(CADInterface):
                 rotation_rad
             )
 
-            # Apply layer property
-            if layer != "0":
-                try:
-                    block_ref.Layer = layer
-                except Exception as e:
-                    logger.warning(f"Failed to set block layer to '{layer}': {e}")
+            # Apply layer and color properties
+            self._apply_properties(block_ref, layer, color)
 
-            self._track_entity(block_ref, "block")
-            
+            # Set attributes if provided and block has attributes
+            if attributes and block_ref.HasAttributes:
+                try:
+                    attrs = block_ref.GetAttributes()
+                    for attr in attrs:
+                        tag = str(attr.TagString).upper()
+                        # Case-insensitive match
+                        original_key = next(
+                            (k for k in attributes if k.upper() == tag), None
+                        )
+                        if original_key is not None:
+                            attr.TextString = str(attributes[original_key])
+                            logger.debug(
+                                f"Set attribute {tag} = {attributes[original_key]}"
+                            )
+                except Exception as e:
+                    logger.warning(f"Failed to set some attributes: {e}")
+
+            self._track_entity(block_ref, "block_reference")
+
             if not _skip_refresh:
                 self.refresh_view()
 
@@ -1666,31 +1689,47 @@ class AutoCADAdapter(CADInterface):
             raise CADOperationError("insert_block", str(e))
 
 
-    def list_blocks(self) -> List[str]:
-        """Get list of all block definitions in the drawing.
+    def list_blocks(self) -> List[Dict[str, Any]]:
+        """List all block definitions in the drawing.
 
         Returns:
-            List of block names (excludes system blocks that start with *)
+            List of dictionaries with block information:
+            - Name: Block name
+            - IsXRef: Whether it's an external reference
+            - IsLayout: Whether it's a layout block
+            - Origin: Block origin point (x, y, z)
 
         Note:
             System blocks (like *Model_Space, *Paper_Space) are filtered out
         """
         try:
             document = self._get_document("list_blocks")
-            blocks: List[str] = []
+            blocks_info: List[Dict[str, Any]] = []
 
             for block in document.Blocks:
                 try:
                     block_name = str(block.Name)
-                    # Filter out system blocks (start with *)
-                    if not block_name.startswith('*'):
-                        blocks.append(block_name)
+                    # Skip model space, paper space and anonymous blocks
+                    if block_name.startswith("*"):
+                        continue
+
+                    origin = block.Origin
+                    blocks_info.append({
+                        "Name": block_name,
+                        "IsXRef": bool(block.IsXRef),
+                        "IsLayout": bool(block.IsLayout),
+                        "Origin": (
+                            round(origin[0], 3),
+                            round(origin[1], 3),
+                            round(origin[2], 3),
+                        ) if origin else (0, 0, 0),
+                    })
                 except Exception as e:
-                    logger.debug(f"Failed to get block name: {e}")
+                    logger.debug(f"Failed to get info for block: {e}")
                     continue
 
-            logger.info(f"Found {len(blocks)} blocks in drawing")
-            return blocks
+            logger.info(f"Found {len(blocks_info)} block definitions")
+            return blocks_info
 
         except Exception as e:
             logger.error(f"Failed to list blocks: {e}")
@@ -1808,6 +1847,80 @@ class AutoCADAdapter(CADInterface):
         except Exception as e:
             logger.error(f"Failed to get block references for '{block_name}': {e}")
             return []
+
+    def get_block_attributes(self, handle: str) -> Dict[str, str]:
+        """Get all attributes from a block reference.
+
+        Args:
+            handle: Handle of the block reference entity
+
+        Returns:
+            Dictionary of attribute tag -> value pairs
+        """
+        try:
+            document = self._get_document("get_block_attributes")
+            entity = document.HandleToObject(handle)
+
+            if not hasattr(entity, "HasAttributes") or not entity.HasAttributes:
+                logger.debug(f"Entity {handle} has no attributes")
+                return {}
+
+            attributes: Dict[str, str] = {}
+            for attr in entity.GetAttributes():
+                tag = str(attr.TagString)
+                value = str(attr.TextString)
+                attributes[tag] = value
+
+            logger.debug(
+                f"Retrieved {len(attributes)} attributes from block {handle}"
+            )
+            return attributes
+
+        except Exception as e:
+            logger.error(f"Failed to get block attributes: {e}")
+            return {}
+
+    def set_block_attributes(
+        self, handle: str, attributes: Dict[str, str]
+    ) -> bool:
+        """Set attributes on a block reference.
+
+        Args:
+            handle: Handle of the block reference entity
+            attributes: Dictionary of attribute tag -> value pairs to set
+
+        Returns:
+            True if at least one attribute was set, False otherwise
+        """
+        try:
+            document = self._get_document("set_block_attributes")
+            entity = document.HandleToObject(handle)
+
+            if not hasattr(entity, "HasAttributes") or not entity.HasAttributes:
+                logger.warning(f"Entity {handle} has no attributes")
+                return False
+
+            # Build case-insensitive lookup
+            attr_lookup = {k.upper(): v for k, v in attributes.items()}
+            set_count = 0
+
+            for attr in entity.GetAttributes():
+                tag_upper = str(attr.TagString).upper()
+                if tag_upper in attr_lookup:
+                    attr.TextString = str(attr_lookup[tag_upper])
+                    set_count += 1
+                    logger.debug(
+                        f"Set attribute {attr.TagString} = {attr_lookup[tag_upper]}"
+                    )
+
+            self.refresh_view()
+            logger.info(f"Set {set_count} attributes on block {handle}")
+            return set_count > 0
+
+        except Exception as e:
+            logger.error(f"Failed to set block attributes: {e}")
+            return False
+
     # ========== Selection Detection ==========
 
     def has_selection(self) -> bool:
