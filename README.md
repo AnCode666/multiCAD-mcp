@@ -38,6 +38,10 @@ Detailed installation instructions are available in [docs/01-SETUP.md](docs/01-S
 Quick start:
 
 ```powershell
+# Install uv (if not installed)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Clone
 git clone https://github.com/AnCode666/multiCAD-mcp.git
 cd multiCAD-mcp
 uv sync --dev

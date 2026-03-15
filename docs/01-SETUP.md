@@ -7,6 +7,18 @@
 - CAD application (AutoCAD, ZWCAD, GstarCAD, or BricsCAD)
 
 ## Installation
+ 
+### 1. Install `uv`
+
+`uv` is the recommended Python package manager for this project. To install it on Windows:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+For other methods or platforms, see the [official uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
+
+### 2. Clone and Setup
 
 ```powershell
 # Clone
