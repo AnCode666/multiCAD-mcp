@@ -112,7 +112,7 @@ Edit `src/config.json` to customize:
     }
   },
   "dashboard": {
-    "port": 6666
+    "port": 8888
   },
   "output": {
     "directory": "~/Documents/multiCAD Exports"
