@@ -300,6 +300,297 @@ def _delete(spec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _area(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate area and perimeter for entities.
+
+    Args:
+        spec: Operation spec with optional keys: handles (str or list), layer (str).
+
+    Returns:
+        Dict with keys: success (bool), count (int), total_area (float), total_perimeter (float), items (list), detail (str).
+    """
+    adapter = get_current_adapter()
+    handles_to_check: List[str] = []
+
+    layer_filter = spec.get("layer")
+    if layer_filter:
+        handles_to_check = adapter.select_by_layer(str(layer_filter).strip())
+    else:
+        handles_raw = spec.get("handles", "")
+        if handles_raw and handles_raw != "all":
+            if isinstance(handles_raw, list):
+                handles_to_check = [str(h).strip() for h in handles_raw if str(h).strip()]
+            else:
+                handles_to_check = parse_handles(str(handles_raw))
+        else:
+            selected = adapter.get_selected_entities()
+            if selected:
+                handles_to_check = selected
+            else:
+                handles_to_check = (
+                    adapter.select_by_type("LWPOLYLINE")
+                    + adapter.select_by_type("POLYLINE")
+                    + adapter.select_by_type("CIRCLE")
+                )
+
+    if not handles_to_check:
+        return {
+            "success": True,
+            "count": 0,
+            "total_area": 0.0,
+            "total_perimeter": 0.0,
+            "items": [],
+            "detail": "No entities found to calculate area",
+        }
+
+    items = []
+    total_area = 0.0
+    total_perimeter = 0.0
+
+    for h in handles_to_check:
+        if hasattr(adapter, "get_entity_area"):
+            info = adapter.get_entity_area(h)
+        else:
+            info = {"handle": h, "area": 0.0, "perimeter": 0.0, "layer": "0"}
+        area_val = float(info.get("area", 0.0))
+        perim_val = float(info.get("perimeter", 0.0))
+        if area_val > 0.0 or perim_val > 0.0:
+            total_area += area_val
+            total_perimeter += perim_val
+            items.append({
+                "handle": h,
+                "layer": info.get("layer", "0"),
+                "type": info.get("object_name", "Entity"),
+                "area": round(area_val, 2),
+                "perimeter": round(perim_val, 2),
+            })
+
+    return {
+        "success": True,
+        "count": len(items),
+        "total_area": round(total_area, 2),
+        "total_perimeter": round(total_perimeter, 2),
+        "unit": "m²",
+        "items": items,
+        "detail": (
+            f"Calculated areas for {len(items)} entities. "
+            f"Total Area: {total_area:.2f} m², Total Perimeter: {total_perimeter:.2f} m"
+        ),
+    }
+
+
+def _area_table(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a CAD Area Schedule Table (Cuadro de Superficies) from closed entities.
+
+    Args:
+        spec: Operation spec with keys:
+            - insertion_point (str or tuple, default "0,0")
+            - layer (str, default "0")
+            - title (str, default "CUADRO DE SUPERFICIES ÚTILES")
+            - row_height (float, default 8.0)
+            - col_width (float, default 40.0)
+
+    Returns:
+        Dict with keys: success (bool), table_handle (str), spaces_count (int), total_area (float), total_perimeter (float), detail (str).
+    """
+    adapter = get_current_adapter()
+    target_layer = str(spec.get("layer", "0")).strip()
+
+    if target_layer and target_layer != "0":
+        handles = adapter.select_by_layer(target_layer)
+    else:
+        handles = (
+            adapter.select_by_type("LWPOLYLINE")
+            + adapter.select_by_type("POLYLINE")
+            + adapter.select_by_type("CIRCLE")
+        )
+
+    if not handles:
+        return {
+            "success": False,
+            "error": f"No measurable entities found on layer '{target_layer}'",
+        }
+
+    items = []
+    total_area = 0.0
+    total_perimeter = 0.0
+
+    for h in handles:
+        if hasattr(adapter, "get_entity_area"):
+            info = adapter.get_entity_area(h)
+        else:
+            info = {"handle": h, "area": 0.0, "perimeter": 0.0, "layer": target_layer}
+        a = float(info.get("area", 0.0))
+        p = float(info.get("perimeter", 0.0))
+        if a > 0.0:
+            total_area += a
+            total_perimeter += p
+            items.append({
+                "handle": h,
+                "layer": info.get("layer", target_layer),
+                "area": a,
+                "perimeter": p,
+            })
+
+    if not items:
+        return {
+            "success": False,
+            "error": "No closed spaces with area > 0 found",
+        }
+
+    title = str(spec.get("title", "CUADRO DE SUPERFICIES ÚTILES")).strip()
+    headers = ["Nº", "Recinto / Capa", "Perímetro (m)", "Superficie (m²)", "% Total"]
+
+    data_rows: List[List[str]] = []
+    for idx, item in enumerate(items, 1):
+        pct = (item["area"] / total_area * 100.0) if total_area > 0 else 0.0
+        data_rows.append([
+            str(idx),
+            str(item["layer"]),
+            f"{item['perimeter']:.2f}",
+            f"{item['area']:.2f}",
+            f"{pct:.1f}%",
+        ])
+
+    # Summary row
+    data_rows.append([
+        "TOTAL",
+        "-",
+        f"{total_perimeter:.2f}",
+        f"{total_area:.2f}",
+        "100.0%",
+    ])
+
+    raw_ins = spec.get("insertion_point", "0,0")
+    if isinstance(raw_ins, (list, tuple)):
+        ins_pt = (float(raw_ins[0]), float(raw_ins[1]))
+    else:
+        parts = str(raw_ins).split(",")
+        ins_pt = (
+            float(parts[0].strip()) if len(parts) > 0 else 0.0,
+            float(parts[1].strip()) if len(parts) > 1 else 0.0,
+        )
+
+    row_h = float(spec.get("row_height", 8.0))
+    col_w = float(spec.get("col_width", 40.0))
+
+    try:
+        table_handle = adapter.draw_table(
+            insertion_point=ins_pt,
+            num_rows=len(data_rows) + 2,  # +1 title, +1 headers
+            num_cols=5,
+            row_height=row_h,
+            col_width=col_w,
+            data=data_rows,
+            title=title,
+            headers=headers,
+            layer="A-ANNO-TABL",
+            color="white",
+        )
+        return {
+            "success": True,
+            "table_handle": table_handle,
+            "spaces_count": len(items),
+            "total_area": round(total_area, 2),
+            "total_perimeter": round(total_perimeter, 2),
+            "detail": (
+                f"Generated CAD table '{title}' at {ins_pt} with {len(items)} spaces. "
+                f"Total Area: {total_area:.2f} m²"
+            ),
+        }
+    except Exception as e:
+        logger.error(f"Failed to draw area schedule table: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def _audit(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Audit drawing entities for CAD Quality Assurance (QA).
+
+    Checks:
+    - Entities drawn on layer '0'
+    - Identifies basic drawing structure health
+
+    Returns:
+        Dict with keys: success (bool), qa_score (int), issues_count (int), issues (list), detail (str).
+    """
+    adapter = get_current_adapter()
+    entities_layer_0 = adapter.select_by_layer("0")
+
+    issues = []
+    if entities_layer_0:
+        issues.append({
+            "type": "layer_0_entities",
+            "severity": "warning",
+            "count": len(entities_layer_0),
+            "detail": (
+                f"{len(entities_layer_0)} entities found on layer '0'. "
+                "Best practice is to assign specific semantic layers."
+            ),
+            "handles": entities_layer_0[:10],
+        })
+
+    deductions = len(entities_layer_0) * 2
+    score = max(0, 100 - min(deductions, 100))
+
+    return {
+        "success": True,
+        "qa_score": score,
+        "issues_count": len(issues),
+        "issues": issues,
+        "detail": (
+            f"CAD QA Audit complete. Quality Score: {score}/100. "
+            f"Issues detected: {len(issues)}."
+        ),
+    }
+
+
+def _set_metadata(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach BIM / semantic metadata to entity handle."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("handles", "")).strip()
+    if not handle:
+        return {"success": False, "error": "Missing 'handle'"}
+
+    key = spec.get("key")
+    val = spec.get("value")
+    metadata = spec.get("metadata")
+
+    data = {}
+    if metadata:
+        if isinstance(metadata, str):
+            try:
+                data = json.loads(metadata)
+            except Exception:
+                data = {"data": metadata}
+        elif isinstance(metadata, dict):
+            data = metadata
+    elif key is not None:
+        data = {str(key): val}
+
+    if hasattr(adapter, "set_entity_metadata"):
+        adapter.set_entity_metadata(handle, data)
+        return {
+            "success": True,
+            "handle": handle,
+            "metadata": data,
+            "detail": f"Attached metadata to entity #{handle}",
+        }
+    return {"success": False, "error": "Adapter does not support metadata attachment"}
+
+
+def _get_metadata(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Retrieve BIM / semantic metadata from entity handle."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("handles", "")).strip()
+    if not handle:
+        return {"success": False, "error": "Missing 'handle'"}
+
+    if hasattr(adapter, "get_entity_metadata"):
+        data = adapter.get_entity_metadata(handle)
+        return {"success": True, "handle": handle, "metadata": data}
+    return {"success": False, "error": "Adapter does not support metadata retrieval"}
+
+
 # Dispatch table: action -> (handler, required_fields)
 ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "select": (_select, ["by", "value"]),
@@ -312,6 +603,11 @@ ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "copy": (_copy, ["handles"]),
     "paste": (_paste, ["base_point"]),
     "delete": (_delete, ["handles"]),
+    "area": (_area, []),
+    "area_table": (_area_table, []),
+    "audit": (_audit, []),
+    "set_metadata": (_set_metadata, []),
+    "get_metadata": (_get_metadata, []),
 }
 
 
@@ -360,6 +656,8 @@ def register_entity_tools(mcp):
                 copy|handles                  → copy|A1,B2
                 paste|base_point              → paste|100,200
                 delete|handles                → delete|A1,B2
+                area|handles                  → area|A1,B2 (or area|layer|A-ROOMS)
+                area_table|ins_x,ins_y|layer  → area_table|0,0|A-ROOMS|Cuadro Áreas
 
                 "handles" = comma-separated entity handles (e.g. "A1B2,C3D4")
                 "by" = "color", "layer", or "type"
@@ -367,6 +665,8 @@ def register_entity_tools(mcp):
                 Example:
                     select|layer|walls
                     move|A1B2,C3D4|10|5
+                    area|layer|A-ESTANCIAS
+                    area_table|100,100|A-ESTANCIAS|Cuadro de Superficies
                     set_color|A1B2,C3D4|red
 
                 JSON format also supported for backwards compatibility.

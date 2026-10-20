@@ -1,0 +1,10 @@
+# Smithery.ai Configuration for multiCAD-mcp
+# Allows automated 1-click installation: npx -y @smithery/cli install multiCAD-mcp --client claude
+
+startCommand:
+  type: stdio
+  config:
+    command: "multicad-mcp"
+    args:
+      - "--transport"
+      - "stdio"
