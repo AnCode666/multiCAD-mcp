@@ -8,7 +8,7 @@ import logging
 import time
 import math
 from pathlib import Path
-from typing import Any, Callable, TypeVar, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, TypeVar, List, Optional, Dict, TYPE_CHECKING
 from functools import wraps
 from contextlib import contextmanager
 import sys
@@ -636,3 +636,103 @@ class UtilityMixin:
             return self._handle_operation_error(
                 operation_name, e, default_return=(success_count, total_count)
             )
+
+    # ========== Human-in-the-Loop Interaction Methods ==========
+
+    def prompt_point(
+        self, prompt: str = "Select point:", base_point: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick a point with crosshair."""
+        try:
+            document = self._get_document("prompt_point")
+            utility = document.Utility
+            prompt_str = prompt if prompt.endswith(" ") or prompt.endswith(":") else prompt + ": "
+            if base_point is not None:
+                bp = self._to_variant_array(base_point)
+                pt = utility.GetPoint(bp, prompt_str)
+            else:
+                pt = utility.GetPoint(prompt_str)
+            point_tuple = (float(pt[0]), float(pt[1]), float(pt[2]))
+            logger.info(f"User picked point: {point_tuple}")
+            return {"success": True, "point": point_tuple, "interactive": True}
+        except Exception as e:
+            err_str = str(e)
+            if "cancelled" in err_str.lower() or "-2145320928" in err_str:
+                return {"success": False, "cancelled": True, "detail": "User cancelled point selection"}
+            logger.error(f"Failed to get point from user: {e}")
+            return {"success": False, "detail": str(e)}
+
+    def prompt_entity(
+        self, prompt: str = "Select entity:"
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick an entity."""
+        try:
+            document = self._get_document("prompt_entity")
+            utility = document.Utility
+            prompt_str = prompt if prompt.endswith(" ") or prompt.endswith(":") else prompt + ": "
+            res = utility.GetEntity(prompt_str)
+            entity = res[0] if isinstance(res, (tuple, list)) else res
+            pt = res[1] if isinstance(res, (tuple, list)) and len(res) > 1 else None
+
+            handle = str(getattr(entity, "Handle", ""))
+            obj_name = str(getattr(entity, "ObjectName", ""))
+            layer = str(getattr(entity, "Layer", ""))
+            picked_pt = tuple(float(c) for c in pt) if pt else None
+
+            logger.info(f"User picked entity {handle} ({obj_name}) on layer {layer}")
+            return {
+                "success": True,
+                "handle": handle,
+                "type": obj_name,
+                "layer": layer,
+                "picked_point": picked_pt,
+                "interactive": True,
+            }
+        except Exception as e:
+            err_str = str(e)
+            if "cancelled" in err_str.lower() or "-2145320928" in err_str:
+                return {"success": False, "cancelled": True, "detail": "User cancelled entity selection"}
+            logger.error(f"Failed to get entity from user: {e}")
+            return {"success": False, "detail": str(e)}
+
+    def prompt_distance(
+        self, prompt: str = "Specify distance:", base_point: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to specify or measure a distance."""
+        try:
+            document = self._get_document("prompt_distance")
+            utility = document.Utility
+            prompt_str = prompt if prompt.endswith(" ") or prompt.endswith(":") else prompt + ": "
+            if base_point is not None:
+                bp = self._to_variant_array(base_point)
+                dist = utility.GetDistance(bp, prompt_str)
+            else:
+                dist = utility.GetDistance(prompt_str)
+            dist_val = float(dist)
+            logger.info(f"User specified distance: {dist_val}")
+            return {"success": True, "distance": dist_val, "interactive": True}
+        except Exception as e:
+            err_str = str(e)
+            if "cancelled" in err_str.lower() or "-2145320928" in err_str:
+                return {"success": False, "cancelled": True, "detail": "User cancelled distance specification"}
+            logger.error(f"Failed to get distance from user: {e}")
+            return {"success": False, "detail": str(e)}
+
+    def prompt_string(
+        self, prompt: str = "Enter string:", has_spaces: bool = True
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD command line to enter text string."""
+        try:
+            document = self._get_document("prompt_string")
+            utility = document.Utility
+            prompt_str = prompt if prompt.endswith(" ") or prompt.endswith(":") else prompt + ": "
+            val = utility.GetString(1 if has_spaces else 0, prompt_str)
+            str_val = str(val)
+            logger.info(f"User entered string: '{str_val}'")
+            return {"success": True, "string": str_val, "interactive": True}
+        except Exception as e:
+            err_str = str(e)
+            if "cancelled" in err_str.lower() or "-2145320928" in err_str:
+                return {"success": False, "cancelled": True, "detail": "User cancelled string input"}
+            logger.error(f"Failed to get string from user: {e}")
+            return {"success": False, "detail": str(e)}
