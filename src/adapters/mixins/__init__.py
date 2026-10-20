@@ -17,6 +17,7 @@ from .entity_mixin import EntityMixin
 from .manipulation_mixin import ManipulationMixin
 from .block_mixin import BlockMixin
 from .export_mixin import ExportMixin
+from .layout_mixin import LayoutMixin
 
 
 @runtime_checkable
@@ -106,6 +107,7 @@ __all__ = [
     "ManipulationMixin",
     "BlockMixin",
     "ExportMixin",
+    "LayoutMixin",
     # Helper classes and functions
     "com_session",
     "SelectionSetManager",

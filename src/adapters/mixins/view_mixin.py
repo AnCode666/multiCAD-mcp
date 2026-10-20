@@ -251,6 +251,91 @@ class ViewMixin:
             logger.error(f"Failed to zoom extents: {e}")
             return False
 
+    def zoom_window(self, corner1: tuple, corner2: tuple) -> bool:
+        """Zoom view to fit bounding box defined by corner1 and corner2."""
+        try:
+            document = self._get_document("zoom_window")
+            c1 = (float(corner1[0]), float(corner1[1]))
+            c2 = (float(corner2[0]), float(corner2[1]))
+            document.SendCommand(f"_zoom _w {c1[0]},{c1[1]} {c2[0]},{c2[1]}\n")
+            logger.debug(f"Zoomed window from {c1} to {c2}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to zoom window: {e}")
+            return False
+
+    def zoom_center(self, center: tuple, magnification: float = 1.0) -> bool:
+        """Zoom view centered on coordinate with specified magnification."""
+        try:
+            document = self._get_document("zoom_center")
+            c = (float(center[0]), float(center[1]))
+            mag = float(magnification)
+            document.SendCommand(f"_zoom _c {c[0]},{c[1]} {mag}\n")
+            logger.debug(f"Zoomed center at {c} with magnification {mag}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to zoom center: {e}")
+            return False
+
+    def set_view_preset(self, preset: str) -> bool:
+        """Set orthographic or isometric 3D view preset."""
+        preset_clean = preset.lower().strip().replace("-", "_")
+        preset_map = {
+            "top": "_view _top\n",
+            "bottom": "_view _bottom\n",
+            "left": "_view _left\n",
+            "right": "_view _right\n",
+            "front": "_view _front\n",
+            "back": "_view _back\n",
+            "sw_iso": "_view _swiso\n",
+            "iso_sw": "_view _swiso\n",
+            "se_iso": "_view _seiso\n",
+            "iso_se": "_view _seiso\n",
+            "ne_iso": "_view _neiso\n",
+            "iso_ne": "_view _neiso\n",
+            "nw_iso": "_view _nwiso\n",
+            "iso_nw": "_view _nwiso\n",
+        }
+        cmd = preset_map.get(preset_clean)
+        if not cmd:
+            logger.warning(f"Unknown view preset: {preset}")
+            return False
+
+        try:
+            document = self._get_document("set_view_preset")
+            document.SendCommand(cmd)
+            logger.info(f"Set view preset to {preset_clean}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set view preset: {e}")
+            return False
+
+    def set_visual_style(self, style: str) -> bool:
+        """Set visual style (wireframe, conceptual, realistic, shaded, etc.)."""
+        style_clean = style.lower().strip()
+        style_map = {
+            "2d": "_vscurrent _2d\n",
+            "wireframe": "_vscurrent _wireframe\n",
+            "conceptual": "_vscurrent _conceptual\n",
+            "realistic": "_vscurrent _realistic\n",
+            "shaded": "_vscurrent _shaded\n",
+            "hidden": "_vscurrent _hidden\n",
+            "xray": "_vscurrent _xray\n",
+        }
+        cmd = style_map.get(style_clean)
+        if not cmd:
+            logger.warning(f"Unknown visual style: {style}")
+            return False
+
+        try:
+            document = self._get_document("set_visual_style")
+            document.SendCommand(cmd)
+            logger.info(f"Set visual style to {style_clean}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set visual style: {e}")
+            return False
+
     def refresh_view(self) -> bool:
         """Refresh the view using multiple techniques for maximum compatibility.
 

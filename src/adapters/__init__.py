@@ -8,5 +8,6 @@ Design:
 """
 
 from .autocad_adapter import AutoCADAdapter
+from .ezdxf_adapter import EzdxfAdapter
 
-__all__ = ["AutoCADAdapter"]
+__all__ = ["AutoCADAdapter", "EzdxfAdapter"]
