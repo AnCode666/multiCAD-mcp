@@ -123,6 +123,26 @@ class AdapterRegistry:
                 logger.debug(f"{ct} not available: {e}")
                 continue
 
+        # Headless DXF fallback when no GUI CAD is active
+        if not only_if_running:
+            try:
+                from adapters.ezdxf_adapter import EzdxfAdapter
+
+                dxf_adapter = EzdxfAdapter()
+                if dxf_adapter.connect():
+                    self._adapter = dxf_adapter
+                    self._cad_type = "dxf"
+                    logger.info("Auto-detected fallback: Headless DXF (ezdxf) active")
+                    return
+            except Exception as e:
+                logger.debug(f"ezdxf headless fallback not available: {e}")
+
+    def set_adapter(self, adapter: Any, cad_type: str = "dxf") -> None:
+        """Manually set the active adapter instance (e.g. for headless DXF or testing)."""
+        with self._instance_lock:
+            self._adapter = adapter
+            self._cad_type = cad_type
+
     def get_cad_instances(self) -> Dict[str, Any]:
         """
         Get the dictionary of all CAD adapter instances.
