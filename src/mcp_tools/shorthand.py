@@ -116,12 +116,36 @@ ENTITY_FIELDS: Dict[str, FieldList] = {
         ("color", False, "white"),
         ("layer", False, "0"),
     ],
+    "wall": [
+        ("start", True, None),
+        ("end", True, None),
+        ("thickness", False, 0.15),
+        ("color", False, "red"),
+        ("layer", False, "A-MURO-ESTR"),
+    ],
+    "door": [
+        ("hinge", True, None),
+        ("width", False, 0.82),
+        ("angle", False, 0.0),
+        ("color", False, "green"),
+        ("layer", False, "A-CARP-PUER"),
+    ],
+    "window": [
+        ("start", True, None),
+        ("end", True, None),
+        ("thickness", False, 0.10),
+        ("color", False, "cyan"),
+        ("layer", False, "A-CARP-VENT"),
+    ],
 }
 
-# Type aliases for rectangle
+# Type aliases for entities
 ENTITY_ALIASES = {
     "rect": "rectangle",
     "tab": "table",
+    "muro": "wall",
+    "puerta": "door",
+    "ventana": "window",
 }
 
 
@@ -207,6 +231,9 @@ def parse_entity_shorthand(line: str) -> Dict[str, Any]:
                 "col_width",
                 "num_rows",
                 "num_cols",
+                "thickness",
+                "width",
+                "angle",
             ):
                 spec[field_name] = _try_number(value)
             else:
@@ -263,6 +290,26 @@ ENTITY_OP_FIELDS: Dict[str, FieldList] = {
     "delete": [
         ("handles", True, None),
     ],
+    "area": [
+        ("handles", False, "all"),
+        ("layer", False, None),
+    ],
+    "area_table": [
+        ("insertion_point", False, "0,0"),
+        ("layer", False, "0"),
+        ("title", False, "CUADRO DE SUPERFICIES ÚTILES"),
+        ("row_height", False, 8.0),
+        ("col_width", False, 40.0),
+    ],
+    "audit": [],
+    "set_metadata": [
+        ("handle", True, None),
+        ("key", False, None),
+        ("value", False, None),
+    ],
+    "get_metadata": [
+        ("handle", True, None),
+    ],
 }
 
 
@@ -271,7 +318,7 @@ def parse_entity_op_shorthand(line: str) -> Dict[str, Any]:
     Parse an entity operation shorthand line.
 
     Args:
-        line: Shorthand like "move|A1,B2|10|5"
+        line: Shorthand like "move|A1,B2|10|5", "area|A1,B2", or "area_table|0,0|A-ESTANCIAS"
 
     Returns:
         Dictionary with action and fields
@@ -284,6 +331,12 @@ def parse_entity_op_shorthand(line: str) -> Dict[str, Any]:
 
     if action not in ENTITY_OP_FIELDS:
         return {"action": action, "error": f"Unknown action: {action}"}
+
+    # Special handling for area|layer|layer_name
+    if action == "area" and len(parts) >= 3 and parts[1].lower() == "layer":
+        return autocorrect_spec(
+            {"action": "area", "handles": "", "layer": parts[2]}, "entity_op"
+        )
 
     fields = ENTITY_OP_FIELDS[action]
     spec: Dict[str, Any] = {"action": action}
@@ -302,6 +355,8 @@ def parse_entity_op_shorthand(line: str) -> Dict[str, Any]:
                 "scale_factor",
                 "center_x",
                 "center_y",
+                "row_height",
+                "col_width",
             ):
                 spec[field_name] = _try_number(value)
             else:
@@ -348,12 +403,18 @@ LAYER_OP_FIELDS: Dict[str, FieldList] = {
     "is_on": [
         ("name", True, None),
     ],
+    "template": [
+        ("name", False, "aeco"),
+    ],
+    "purge": [],
 }
 
 # Action aliases for layers
 LAYER_ACTION_ALIASES = {
     "on": "turn_on",
     "off": "turn_off",
+    "plantilla": "template",
+    "purgar": "purge",
 }
 
 
@@ -593,17 +654,30 @@ def _split_entries(input_str: str) -> List[str]:
     return entries
 
 
-def parse_drawing_input(input_str: str) -> List[Dict[str, Any]]:
+def parse_drawing_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Parse drawing entities from shorthand or JSON.
+    Parse drawing entities from shorthand, JSON string, or structured objects.
 
     Args:
-        input_str: Shorthand or JSON input
+        input_data: Shorthand string, JSON string, dict, or list of entities
 
     Returns:
         List of entity specifications
     """
-    input_str = input_str.strip()
+    if isinstance(input_data, dict):
+        return [autocorrect_spec(input_data, "entity")]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(autocorrect_spec(item, "entity"))
+            elif isinstance(item, str):
+                res.append(parse_entity_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
 
     # Detect JSON
     if input_str.startswith("[") or input_str.startswith("{"):
@@ -620,17 +694,30 @@ def parse_drawing_input(input_str: str) -> List[Dict[str, Any]]:
     return [parse_entity_shorthand(entry) for entry in entries]
 
 
-def parse_entity_ops_input(input_str: str) -> List[Dict[str, Any]]:
+def parse_entity_ops_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Parse entity operations from shorthand or JSON.
+    Parse entity operations from shorthand, JSON string, or structured objects.
 
     Args:
-        input_str: Shorthand or JSON input
+        input_data: Shorthand string, JSON string, dict, or list of operations
 
     Returns:
         List of operation specifications
     """
-    input_str = input_str.strip()
+    if isinstance(input_data, dict):
+        return [autocorrect_spec(input_data, "entity_op")]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(autocorrect_spec(item, "entity_op"))
+            elif isinstance(item, str):
+                res.append(parse_entity_op_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
 
     # Detect JSON
     if input_str.startswith("[") or input_str.startswith("{"):
@@ -646,17 +733,30 @@ def parse_entity_ops_input(input_str: str) -> List[Dict[str, Any]]:
     return [parse_entity_op_shorthand(entry) for entry in entries]
 
 
-def parse_layer_ops_input(input_str: str) -> List[Dict[str, Any]]:
+def parse_layer_ops_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Parse layer operations from shorthand or JSON.
+    Parse layer operations from shorthand, JSON string, or structured objects.
 
     Args:
-        input_str: Shorthand or JSON input
+        input_data: Shorthand string, JSON string, dict, or list of operations
 
     Returns:
         List of operation specifications
     """
-    input_str = input_str.strip()
+    if isinstance(input_data, dict):
+        return [autocorrect_spec(input_data, "layer_op")]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(autocorrect_spec(item, "layer_op"))
+            elif isinstance(item, str):
+                res.append(parse_layer_op_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
 
     # Detect JSON
     if input_str.startswith("[") or input_str.startswith("{"):
@@ -672,17 +772,30 @@ def parse_layer_ops_input(input_str: str) -> List[Dict[str, Any]]:
     return [parse_layer_op_shorthand(entry) for entry in entries]
 
 
-def parse_block_ops_input(input_str: str) -> List[Dict[str, Any]]:
+def parse_block_ops_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Parse block operations from shorthand or JSON.
+    Parse block operations from shorthand, JSON string, or structured objects.
 
     Args:
-        input_str: Shorthand or JSON input
+        input_data: Shorthand string, JSON string, dict, or list of operations
 
     Returns:
         List of operation specifications
     """
-    input_str = input_str.strip()
+    if isinstance(input_data, dict):
+        return [autocorrect_spec(input_data, "block_op")]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(autocorrect_spec(item, "block_op"))
+            elif isinstance(item, str):
+                res.append(parse_block_op_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
 
     # Detect JSON
     if input_str.startswith("[") or input_str.startswith("{"):
@@ -698,17 +811,30 @@ def parse_block_ops_input(input_str: str) -> List[Dict[str, Any]]:
     return [parse_block_op_shorthand(entry) for entry in entries]
 
 
-def parse_file_ops_input(input_str: str) -> List[Dict[str, Any]]:
+def parse_file_ops_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Parse file operations from shorthand or JSON.
+    Parse file operations from shorthand, JSON string, or structured objects.
 
     Args:
-        input_str: Shorthand or JSON input
+        input_data: Shorthand string, JSON string, dict, or list of operations
 
     Returns:
         List of operation specifications
     """
-    input_str = input_str.strip()
+    if isinstance(input_data, dict):
+        return [autocorrect_spec(input_data, "file_op")]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(autocorrect_spec(item, "file_op"))
+            elif isinstance(item, str):
+                res.append(parse_file_op_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
 
     # Detect JSON
     if input_str.startswith("[") or input_str.startswith("{"):
@@ -722,3 +848,118 @@ def parse_file_ops_input(input_str: str) -> List[Dict[str, Any]]:
 
     entries = _split_entries(input_str)
     return [parse_file_op_shorthand(entry) for entry in entries]
+
+
+# ========== Session Operations Parser ==========
+
+SESSION_OP_FIELDS: Dict[str, FieldList] = {
+    "zoom_extents": [],
+    "zoom_window": [
+        ("corner1", True, None),
+        ("corner2", True, None),
+    ],
+    "zoom_center": [
+        ("center", True, None),
+        ("magnification", False, 1.0),
+    ],
+    "set_view_preset": [
+        ("preset", True, None),
+    ],
+    "set_visual_style": [
+        ("style", True, None),
+    ],
+    "undo": [
+        ("count", False, 1),
+    ],
+    "redo": [
+        ("count", False, 1),
+    ],
+    "screenshot": [],
+    "export_view": [],
+    "connect": [],
+    "disconnect": [],
+    "status": [],
+    "list_supported": [],
+    "check_running": [],
+    "open_dashboard": [
+        ("host", False, None),
+        ("port", False, None),
+    ],
+}
+
+SESSION_ALIASES = {
+    "ze": "zoom_extents",
+    "zw": "zoom_window",
+    "zc": "zoom_center",
+    "preset": "set_view_preset",
+    "view": "set_view_preset",
+    "style": "set_visual_style",
+    "preview": "export_view",
+}
+
+
+def parse_session_op_shorthand(line: str) -> Dict[str, Any]:
+    """Parse a session or view operation shorthand line.
+
+    Examples:
+        - "ze" -> {"action": "zoom_extents"}
+        - "zw|0,0|100,100" -> {"action": "zoom_window", "corner1": "0,0", "corner2": "100,100"}
+        - "preset|top" -> {"action": "set_view_preset", "preset": "top"}
+        - "style|conceptual" -> {"action": "set_visual_style", "style": "conceptual"}
+        - "undo|2" -> {"action": "undo", "count": 2}
+    """
+    parts = [p.strip() for p in line.split("|")]
+    if not parts:
+        return {"error": "Empty input"}
+
+    raw_action = parts[0].lower()
+    action = SESSION_ALIASES.get(raw_action, raw_action)
+
+    if action not in SESSION_OP_FIELDS:
+        return {"action": action, "error": f"Unknown action: {action}"}
+
+    fields = SESSION_OP_FIELDS[action]
+    spec: Dict[str, Any] = {"action": action}
+
+    for i, (field_name, required, default) in enumerate(fields):
+        value_index = i + 1
+        if value_index < len(parts) and parts[value_index]:
+            val = parts[value_index]
+            if field_name in ("count", "magnification", "port"):
+                spec[field_name] = _try_number(val)
+            else:
+                spec[field_name] = val
+        elif default is not None:
+            spec[field_name] = default
+
+    return spec
+
+
+def parse_session_input(
+    input_data: Union[str, List[Any], Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Parse session/view operations from shorthand, JSON string, or structured objects."""
+    if isinstance(input_data, dict):
+        return [input_data]
+    if isinstance(input_data, list):
+        res = []
+        for item in input_data:
+            if isinstance(item, dict):
+                res.append(item)
+            elif isinstance(item, str):
+                res.append(parse_session_op_shorthand(item.strip()))
+        return res
+
+    input_str = str(input_data).strip()
+    if input_str.startswith("[") or input_str.startswith("{"):
+        try:
+            data = json.loads(input_str)
+            if isinstance(data, dict):
+                return [data]
+            return list(data)
+        except json.JSONDecodeError:
+            pass
+
+    entries = _split_entries(input_str)
+    return [parse_session_op_shorthand(entry) for entry in entries]
+

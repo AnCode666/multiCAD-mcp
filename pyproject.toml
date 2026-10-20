@@ -39,6 +39,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "typing-extensions>=4.5.0",
+    "ezdxf>=1.1.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,10 @@ Homepage = "https://github.com/ancode666/multiCAD-mcp"
 Documentation = "https://github.com/ancode666/multiCAD-mcp/blob/main/README.md"
 Repository = "https://github.com/ancode666/multiCAD-mcp.git"
 "Bug Tracker" = "https://github.com/ancode666/multiCAD-mcp/issues"
+
+[project.scripts]
+multicad-mcp = "server:main"
+
 
 
 [tool.mypy]

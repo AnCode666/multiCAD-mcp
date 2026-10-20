@@ -82,19 +82,49 @@ logger.info(f"Supported CAD types: {', '.join(get_supported_cads())}")
 logger.info("CAD applications will be connected on first tool use (lazy loading)")
 
 
-if __name__ == "__main__":
+def main():
+    """Main CLI entrypoint for multiCAD-MCP server."""
+    import argparse
     import threading
     import uvicorn
 
+    parser = argparse.ArgumentParser(description="multiCAD-MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http", "auto"],
+        default="auto",
+        help="Transport mode: stdio, http, or auto (default: auto)",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=None,
+        help="Dashboard and HTTP host (default from config)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Dashboard and HTTP port (default from config)",
+    )
+    parser.add_argument(
+        "--no-dashboard",
+        action="store_true",
+        help="Disable the web dashboard in stdio mode",
+    )
+
+    args = parser.parse_args()
+
     # Configuration from config.json
     config = get_config()
-    host = config.dashboard.host
-    port = config.dashboard.port
+    host = args.host or config.dashboard.host
+    port = args.port or config.dashboard.port
 
-    # Autodetect transport mode:
-    # - If stdin is a TTY (interactive terminal) → HTTP with dashboard
-    # - If stdin is a pipe (Claude Desktop, etc.) → stdio
-    use_stdio = not sys.stdin.isatty()
+    # Determine transport
+    if args.transport == "auto":
+        use_stdio = not sys.stdin.isatty()
+    else:
+        use_stdio = args.transport == "stdio"
 
     def run_dashboard():
         """Helper to run uvicorn in a thread."""
@@ -105,9 +135,10 @@ if __name__ == "__main__":
         if use_stdio:
             logger.info("Starting multiCAD-MCP server in stdio mode...")
 
-            # Start dashboard in background
-            web_thread = threading.Thread(target=run_dashboard, daemon=True)
-            web_thread.start()
+            # Start dashboard in background if enabled
+            if not args.no_dashboard:
+                web_thread = threading.Thread(target=run_dashboard, daemon=True)
+                web_thread.start()
 
             # Run MCP stdio
             mcp.run(transport="stdio")
@@ -115,7 +146,6 @@ if __name__ == "__main__":
             logger.info("Starting multiCAD-MCP server in HTTP mode...")
 
             # Mount dashboard on the same app
-            # Note: FastMCP.http_app allows mounting additional FastAPI apps
             app = mcp.http_app()
             app.mount("/", api_app)
 
@@ -129,3 +159,8 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Server error: {e}", exc_info=True)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
