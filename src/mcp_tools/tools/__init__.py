@@ -20,6 +20,12 @@ from .files import register_file_tools
 from .entities import register_entity_tools
 from .export import register_export_tools
 from .blocks import register_block_tools
+from .interaction import register_interaction_tools
+from .xrefs import register_xref_tools
+from .ce3x_bridge import register_ce3x_bridge_tools
+from .inspection import register_inspection_tools
+from .annotations import register_annotation_tools
+from .layouts import register_layout_tools
 
 __all__ = [
     "register_session_tools",
@@ -29,4 +35,11 @@ __all__ = [
     "register_entity_tools",
     "register_export_tools",
     "register_block_tools",
+    "register_interaction_tools",
+    "register_xref_tools",
+    "register_ce3x_bridge_tools",
+    "register_inspection_tools",
+    "register_annotation_tools",
+    "register_layout_tools",
 ]
+

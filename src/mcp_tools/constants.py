@@ -69,3 +69,46 @@ CAD_WINDOW_SEARCH_TERMS = {
     "gcad": "GstarCAD",
     "bricscad": "BricsCAD",
 }
+
+# ========== Standard Layer Templates (AECO, AIA, MEP) ==========
+
+LAYER_TEMPLATES = {
+    "aeco": [
+        {"name": "A-MURO-ESTR", "color": "red", "lineweight": 50, "description": "Muros portantes y elementos estructurales"},
+        {"name": "A-TABI-PART", "color": "yellow", "lineweight": 30, "description": "Tabiquería y particiones interiores"},
+        {"name": "A-CARP-EXTE", "color": "cyan", "lineweight": 18, "description": "Carpintería exterior y cerramientos vidriados"},
+        {"name": "A-CARP-INTE", "color": "green", "lineweight": 18, "description": "Carpintería interior y abatimientos de puertas"},
+        {"name": "A-MOBI-SANI", "color": "gray", "lineweight": 13, "description": "Mobiliario fijo y aparatos sanitarios"},
+        {"name": "A-COTA-ALIN", "color": "white", "lineweight": 18, "description": "Líneas de cota, niveles y ejes de referencia"},
+        {"name": "A-TEXT-ESTA", "color": "white", "lineweight": 25, "description": "Textos generales y nombres de estancias"},
+        {"name": "A-PAVI-TRAM", "color": "light_gray", "lineweight": 9, "description": "Tramas de pavimento y sombreados"},
+        {"name": "E-INST-ELEC", "color": "magenta", "lineweight": 25, "description": "Instalaciones eléctricas e iluminación"},
+        {"name": "E-INST-FONT", "color": "blue", "lineweight": 25, "description": "Fontanería, saneamiento y climatización"},
+    ],
+    "aia": [
+        {"name": "A-WALL-FULL", "color": "red", "lineweight": 50, "description": "Full height structural walls"},
+        {"name": "A-WALL-PRTN", "color": "yellow", "lineweight": 30, "description": "Interior non-structural partitions"},
+        {"name": "A-DOOR", "color": "green", "lineweight": 18, "description": "Doors and door swings"},
+        {"name": "A-GLAZ", "color": "cyan", "lineweight": 18, "description": "Windows, storefronts and curtain walls"},
+        {"name": "A-FLOR-FIXT", "color": "gray", "lineweight": 13, "description": "Plumbing fixtures and millwork"},
+        {"name": "A-ANNO-DIMS", "color": "white", "lineweight": 18, "description": "Dimensions and stringers"},
+        {"name": "A-ANNO-TEXT", "color": "white", "lineweight": 25, "description": "Room labels, notes and callouts"},
+    ],
+    "mep": [
+        {"name": "M-HVAC-DUCT", "color": "cyan", "lineweight": 35, "description": "HVAC ductwork and dampers"},
+        {"name": "P-PLUM-PIPE", "color": "blue", "lineweight": 35, "description": "Plumbing and drainage pipes"},
+        {"name": "E-POWR-CBLT", "color": "magenta", "lineweight": 35, "description": "Power circuits and cable trays"},
+        {"name": "F-PROT-EQPM", "color": "red", "lineweight": 35, "description": "Fire protection sprinklers and alarms"},
+    ]
+}
+
+# Aliases for templates
+LAYER_TEMPLATE_ALIASES = {
+    "cte": "aeco",
+    "arquitectura": "aeco",
+    "edificacion": "aeco",
+    "standard": "aeco",
+    "us": "aia",
+    "instalaciones": "mep",
+}
+

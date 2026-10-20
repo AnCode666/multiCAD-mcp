@@ -466,6 +466,110 @@ def _draw_table(spec: Dict[str, Any]) -> str:
     )
 
 
+def _draw_wall(spec: Dict[str, Any]) -> str:
+    """Draw a wall macro as a closed rectangular polyline with thickness."""
+    import math
+
+    p1 = parse_coordinate(spec["start"])
+    p2 = parse_coordinate(spec["end"])
+    thickness = float(spec.get("thickness", 0.15))
+    layer = str(spec.get("layer", "A-MURO-ESTR"))
+    color = spec.get("color", "red")
+
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return ""
+
+    half_th = thickness / 2.0
+    nx = (-dy / length) * half_th
+    ny = (dx / length) * half_th
+
+    c1 = (p1[0] + nx, p1[1] + ny)
+    c2 = (p2[0] + nx, p2[1] + ny)
+    c3 = (p2[0] - nx, p2[1] - ny)
+    c4 = (p1[0] - nx, p1[1] - ny)
+
+    adapter = get_current_adapter()
+    return adapter.draw_polyline(
+        [c1, c2, c3, c4],
+        closed=True,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+
+
+def _draw_door(spec: Dict[str, Any]) -> str:
+    """Draw an architectural door macro (leaf line + 90-degree swing arc)."""
+    import math
+
+    hinge = parse_coordinate(spec["hinge"])
+    width = float(spec.get("width", 0.82))
+    base_angle = float(spec.get("angle", 0.0))
+    layer = str(spec.get("layer", "A-CARP-PUER"))
+    color = spec.get("color", "green")
+
+    open_angle_rad = math.radians(base_angle + 90.0)
+    leaf_end = (
+        hinge[0] + width * math.cos(open_angle_rad),
+        hinge[1] + width * math.sin(open_angle_rad),
+    )
+
+    adapter = get_current_adapter()
+    leaf_handle = adapter.draw_line(
+        hinge, leaf_end, layer=layer, color=color, _skip_refresh=True
+    )
+    adapter.draw_arc(
+        hinge,
+        radius=width,
+        start_angle=base_angle,
+        end_angle=base_angle + 90.0,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+    return leaf_handle
+
+
+def _draw_window(spec: Dict[str, Any]) -> str:
+    """Draw an architectural window macro (frame outline + central glass line)."""
+    import math
+
+    p1 = parse_coordinate(spec["start"])
+    p2 = parse_coordinate(spec["end"])
+    thickness = float(spec.get("thickness", 0.10))
+    layer = str(spec.get("layer", "A-CARP-VENT"))
+    color = spec.get("color", "cyan")
+
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return ""
+
+    half_th = thickness / 2.0
+    nx = (-dy / length) * half_th
+    ny = (dx / length) * half_th
+
+    c1 = (p1[0] + nx, p1[1] + ny)
+    c2 = (p2[0] + nx, p2[1] + ny)
+    c3 = (p2[0] - nx, p2[1] - ny)
+    c4 = (p1[0] - nx, p1[1] - ny)
+
+    adapter = get_current_adapter()
+    frame_handle = adapter.draw_polyline(
+        [c1, c2, c3, c4],
+        closed=True,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+    adapter.draw_line(p1, p2, layer=layer, color=color, _skip_refresh=True)
+    return frame_handle
+
+
 # Dispatch table: type name -> (handler, required_fields)
 ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "line": (_draw_line, ["start", "end"]),
@@ -480,6 +584,9 @@ ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "leader": (_draw_leader_unified, ["points"]),
     "mleader": (_draw_leader_unified, ["leader_groups"]),
     "table": (_draw_table, ["insertion_point", "num_rows", "num_cols"]),
+    "wall": (_draw_wall, ["start", "end"]),
+    "door": (_draw_door, ["hinge"]),
+    "window": (_draw_window, ["start", "end"]),
 }
 
 

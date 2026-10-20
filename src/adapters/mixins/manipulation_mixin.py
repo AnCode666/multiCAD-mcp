@@ -6,7 +6,7 @@ Handles entity manipulation operations (move, rotate, scale, copy, paste, arrays
 
 import logging
 import time
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, Any, TYPE_CHECKING
 
 from mcp_tools.constants import (
     SS_COPY,
@@ -562,3 +562,153 @@ class ManipulationMixin:
         except Exception as e:
             logger.error(f"Failed to create path array: {e}")
             return []
+
+    def offset_entity(
+        self, handle: str, distance: float, side_point: Optional[Any] = None
+    ) -> List[str]:
+        """Offset a line, arc, circle, or polyline by distance via COM."""
+        self._validate_connection()
+        document = self._get_document("offset_entity")
+        entity = document.HandleToObject(handle)
+        new_handles = []
+        try:
+            res = entity.Offset(distance)
+            if res:
+                if isinstance(res, (tuple, list)):
+                    for e in res:
+                        new_handles.append(str(e.Handle))
+                else:
+                    new_handles.append(str(res.Handle))
+            self.refresh_view()
+            return new_handles
+        except Exception as e:
+            logger.error(f"Failed to offset entity {handle}: {e}")
+            return []
+
+    def fillet_entities(
+        self, handle1: str, handle2: str, radius: float = 0.0
+    ) -> Optional[str]:
+        """Fillet two entities with radius via COM."""
+        self._validate_connection()
+        document = self._get_document("fillet_entities")
+        try:
+            cmd = f"_FILLET R {radius} (handent \"{handle1}\") (handent \"{handle2}\")\n"
+            document.SendCommand(cmd)
+            self.refresh_view()
+            return handle1
+        except Exception as e:
+            logger.error(f"Failed to fillet entities {handle1}, {handle2}: {e}")
+            return None
+
+    def chamfer_entities(
+        self, handle1: str, handle2: str, dist1: float = 0.0, dist2: float = 0.0
+    ) -> Optional[str]:
+        """Chamfer two entities with setback distances via COM."""
+        self._validate_connection()
+        document = self._get_document("chamfer_entities")
+        try:
+            cmd = f"_CHAMFER D {dist1} {dist2} (handent \"{handle1}\") (handent \"{handle2}\")\n"
+            document.SendCommand(cmd)
+            self.refresh_view()
+            return handle1
+        except Exception as e:
+            logger.error(f"Failed to chamfer entities {handle1}, {handle2}: {e}")
+            return None
+
+    def explode_entity(self, handle: str) -> List[str]:
+        """Explode a composite entity (block or polyline) into primitives via COM."""
+        self._validate_connection()
+        document = self._get_document("explode_entity")
+        entity = document.HandleToObject(handle)
+        new_handles = []
+        try:
+            exploded = entity.Explode()
+            if exploded:
+                for e in exploded:
+                    new_handles.append(str(e.Handle))
+            self.refresh_view()
+            return new_handles
+        except Exception as e:
+            logger.error(f"Failed to explode entity {handle}: {e}")
+            return []
+
+    def match_properties(self, source_handle: str, target_handles: List[str]) -> bool:
+        """Copy layer, color, linetype, and lineweight from source to target entities via COM."""
+        self._validate_connection()
+        document = self._get_document("match_properties")
+        source = document.HandleToObject(source_handle)
+        src_layer = source.Layer
+        src_color = source.Color
+        src_linetype = source.Linetype
+        src_weight = getattr(source, "Lineweight", 0)
+
+        for th in target_handles:
+            try:
+                target = document.HandleToObject(th)
+                target.Layer = src_layer
+                target.Color = src_color
+                target.Linetype = src_linetype
+                if hasattr(target, "Lineweight"):
+                    target.Lineweight = src_weight
+            except Exception as e:
+                logger.warning(f"Failed to match properties on {th}: {e}")
+        self.refresh_view()
+        return True
+
+    def create_boundary(
+        self, internal_point: Any, layer: str = "0"
+    ) -> Optional[str]:
+        """Detect closed boundary around internal point and create polyline via COM."""
+        self._validate_connection()
+        document = self._get_document("create_boundary")
+        try:
+            pt = (float(internal_point[0]), float(internal_point[1]))
+            # Count entities before
+            count_before = document.ModelSpace.Count
+            document.SendCommand(f"_-BOUNDARY {pt[0]},{pt[1]} \n")
+            self.refresh_view()
+            if document.ModelSpace.Count > count_before:
+                new_entity = document.ModelSpace.Item(document.ModelSpace.Count - 1)
+                if layer and layer != "0":
+                    new_entity.Layer = layer
+                return str(new_entity.Handle)
+            return None
+        except Exception as e:
+            logger.error(f"Failed to create boundary at {internal_point}: {e}")
+            return None
+
+    def join_entities(
+        self, handles: List[str], tolerance: float = 0.01
+    ) -> Optional[str]:
+        """Join loose connected lines and arcs into a polyline via COM."""
+        self._validate_connection()
+        document = self._get_document("join_entities")
+        if not handles or len(handles) < 2:
+            return None
+        try:
+            count_before = document.ModelSpace.Count
+            sel_lisp = " ".join([f'(handent "{h}")' for h in handles])
+            document.SendCommand(f"_JOIN {sel_lisp} \n")
+            self.refresh_view()
+            # If joined into a single polyline, the first handle or newly created one is returned
+            return handles[0]
+        except Exception as e:
+            logger.error(f"Failed to join entities {handles}: {e}")
+            return None
+
+    def trim_extend_entity(
+        self, handle: str, boundary_handle: str, mode: str = "trim"
+    ) -> bool:
+        """Trim or extend a line against a boundary edge via COM."""
+        self._validate_connection()
+        document = self._get_document("trim_extend_entity")
+        try:
+            cmd = "_TRIM" if mode.lower() == "trim" else "_EXTEND"
+            document.SendCommand(f"{cmd} (handent \"{boundary_handle}\") \n (handent \"{handle}\") \n\n")
+            self.refresh_view()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to {mode} entity {handle} against {boundary_handle}: {e}")
+            return False
+
+

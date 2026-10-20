@@ -23,6 +23,12 @@ from mcp_tools.tools import (
     register_entity_tools,
     register_export_tools,
     register_block_tools,
+    register_interaction_tools,
+    register_xref_tools,
+    register_ce3x_bridge_tools,
+    register_inspection_tools,
+    register_annotation_tools,
+    register_layout_tools,
 )
 from web.api import api_app, log_handler
 
@@ -46,6 +52,9 @@ def register_all_tools():
     - Entity selection and manipulation
     - Block management
     - Export and data extraction
+    - Human-in-the-Loop interaction
+    - Drawing inspection and interactive HTML5 viewer
+    - Smart architectural annotations
     """
     logger.info("Registering MCP tools...")
 
@@ -70,6 +79,25 @@ def register_all_tools():
     register_export_tools(mcp)
     logger.debug("  ✓ Export tools registered")
 
+    register_interaction_tools(mcp)
+    logger.debug("  ✓ Interaction tools registered")
+
+    register_xref_tools(mcp)
+    logger.debug("  ✓ XREF tools registered")
+
+    register_ce3x_bridge_tools(mcp)
+    logger.debug("  ✓ CE3X ConTech Bridge tools registered")
+
+    register_inspection_tools(mcp)
+    logger.debug("  ✓ Drawing inspection & viewer tools registered")
+
+    register_annotation_tools(mcp)
+    logger.debug("  ✓ Smart annotation tools registered")
+
+    register_layout_tools(mcp)
+    logger.debug("  ✓ Layout and sheet presentation tools registered")
+
+
     logger.info("All MCP tools registered successfully")
 
 
@@ -82,19 +110,52 @@ logger.info(f"Supported CAD types: {', '.join(get_supported_cads())}")
 logger.info("CAD applications will be connected on first tool use (lazy loading)")
 
 
-if __name__ == "__main__":
+def main():
+    """Main entrypoint for multiCAD-MCP server."""
+    import argparse
     import threading
     import uvicorn
 
+    parser = argparse.ArgumentParser(
+        description=f"multiCAD-MCP Server v{__version__} - MCP Server for CAD control"
+    )
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default=None,
+        help="Transport mode (stdio or http). Autodetected if not specified.",
+    )
+    parser.add_argument(
+        "--host",
+        default=None,
+        help="Host for HTTP dashboard (default from config.json)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Port for HTTP dashboard (default from config.json)",
+    )
+    parser.add_argument(
+        "--no-dashboard",
+        action="store_true",
+        help="Disable background web dashboard in stdio mode",
+    )
+    args = parser.parse_args()
+
     # Configuration from config.json
     config = get_config()
-    host = config.dashboard.host
-    port = config.dashboard.port
+    host = args.host or config.dashboard.host
+    port = args.port or config.dashboard.port
 
     # Autodetect transport mode:
+    # - If explicit --transport is given, use it
     # - If stdin is a TTY (interactive terminal) → HTTP with dashboard
     # - If stdin is a pipe (Claude Desktop, etc.) → stdio
-    use_stdio = not sys.stdin.isatty()
+    if args.transport:
+        use_stdio = args.transport == "stdio"
+    else:
+        use_stdio = not sys.stdin.isatty()
 
     def run_dashboard():
         """Helper to run uvicorn in a thread."""
@@ -105,9 +166,10 @@ if __name__ == "__main__":
         if use_stdio:
             logger.info("Starting multiCAD-MCP server in stdio mode...")
 
-            # Start dashboard in background
-            web_thread = threading.Thread(target=run_dashboard, daemon=True)
-            web_thread.start()
+            # Start dashboard in background unless disabled
+            if not args.no_dashboard:
+                web_thread = threading.Thread(target=run_dashboard, daemon=True)
+                web_thread.start()
 
             # Run MCP stdio
             mcp.run(transport="stdio")
@@ -129,3 +191,8 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Server error: {e}", exc_info=True)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+

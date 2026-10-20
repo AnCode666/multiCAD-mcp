@@ -221,6 +221,56 @@ def _open_dashboard(spec: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "detail": f"Failed to open dashboard: {e}"}
 
 
+def _zoom_window(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Zoom view to window bounding box."""
+    from mcp_tools.helpers import parse_coordinate
+
+    adapter = get_adapter()
+    c1 = parse_coordinate(spec.get("corner1", "0,0"))
+    c2 = parse_coordinate(spec.get("corner2", "100,100"))
+    success = adapter.zoom_window(c1, c2)
+    return {
+        "success": success,
+        "detail": f"Zoomed window from {c1} to {c2}" if success else "Failed to zoom window",
+    }
+
+
+def _zoom_center(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Zoom view centered on coordinate."""
+    from mcp_tools.helpers import parse_coordinate
+
+    adapter = get_adapter()
+    center = parse_coordinate(spec.get("center", "0,0"))
+    mag = float(spec.get("magnification", 1.0))
+    success = adapter.zoom_center(center, mag)
+    return {
+        "success": success,
+        "detail": f"Zoomed center at {center} (mag: {mag})" if success else "Failed to zoom center",
+    }
+
+
+def _set_view_preset(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Set orthographic or isometric 3D view preset."""
+    adapter = get_adapter()
+    preset = str(spec.get("preset", "top"))
+    success = adapter.set_view_preset(preset)
+    return {
+        "success": success,
+        "detail": f"Set view preset to '{preset}'" if success else f"Failed to set view preset to '{preset}'",
+    }
+
+
+def _set_visual_style(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Set visual style (wireframe, conceptual, realistic, shaded)."""
+    adapter = get_adapter()
+    style = str(spec.get("style", "wireframe"))
+    success = adapter.set_visual_style(style)
+    return {
+        "success": success,
+        "detail": f"Set visual style to '{style}'" if success else f"Failed to set visual style to '{style}'",
+    }
+
+
 # Dispatch table: action -> (handler, required_fields)
 SESSION_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "connect": (_connect, []),
@@ -229,6 +279,10 @@ SESSION_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "list_supported": (_list_supported, []),
     "check_running": (_check_running, []),
     "zoom_extents": (_zoom_extents, []),
+    "zoom_window": (_zoom_window, ["corner1", "corner2"]),
+    "zoom_center": (_zoom_center, ["center"]),
+    "set_view_preset": (_set_view_preset, ["preset"]),
+    "set_visual_style": (_set_visual_style, ["style"]),
     "undo": (_undo, []),
     "redo": (_redo, []),
     "screenshot": (_screenshot, []),
@@ -306,17 +360,15 @@ def register_session_tools(mcp):
         Returns:
             JSON result with per-operation status
         """
+        from mcp_tools.shorthand import parse_session_input
+
         try:
-            ops_data = (
-                json.loads(operations) if isinstance(operations, str) else operations
-            )
-            if not isinstance(ops_data, list):
-                ops_data = [ops_data]
-        except json.JSONDecodeError as e:
+            ops_data = parse_session_input(operations)
+        except Exception as e:
             return json.dumps(
                 {
                     "success": False,
-                    "error": f"Invalid JSON input: {str(e)}",
+                    "error": f"Invalid session operation input: {str(e)}",
                     "total": 0,
                     "succeeded": 0,
                     "results": [],
@@ -401,3 +453,21 @@ def register_session_tools(mcp):
             },
             indent=2,
         )
+
+    @mcp.tool()
+    def manage_view(
+        operations: str,
+    ) -> str:
+        """
+        Manage CAD viewport, camera zoom, view presets, and visual styles.
+
+        Shorthand:
+        - ze (or zoom_extents): Zoom to fit all entities
+        - zw|x1,y1|x2,y2 (or zoom_window): Zoom into bounding box
+        - zc|x,y|mag (or zoom_center): Center view on coordinate
+        - preset|top|bottom|front|back|left|right|sw_iso|se_iso: Set 3D or orthographic projection
+        - style|2d|wireframe|conceptual|realistic|shaded: Set visual rendering style
+        - screenshot / preview: Capture visual snapshot of the drawing
+        - undo|count / redo|count: History navigation
+        """
+        return manage_session(operations)
