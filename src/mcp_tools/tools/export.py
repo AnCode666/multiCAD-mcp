@@ -12,6 +12,7 @@ Two dimensions:
 
 import json
 import logging
+import os
 from pathlib import Path
 
 
@@ -150,6 +151,97 @@ def _export_excel(adapter, data, filename: str, scope_label: str) -> str:
     )
 
 
+def _export_bc3(adapter, filename: str) -> str:
+    """Export CAD measurements to FIEBDC-3 (.bc3) format for budget and ConTech integration."""
+    from core.config import get_config
+
+    config = get_config()
+    output_dir = Path(config.output.directory).expanduser().resolve()
+    clean_filename = (
+        filename if filename.lower().endswith(".bc3") else f"{filename}.bc3"
+    )
+    target_path = output_dir / clean_filename
+
+    # Collect distinct entity handles that can represent measurable boundaries
+    raw_handles = (
+        adapter.select_by_type("LWPOLYLINE")
+        + adapter.select_by_type("POLYLINE")
+        + adapter.select_by_type("CIRCLE")
+    )
+    handles = list(dict.fromkeys(raw_handles))
+
+    bc3_lines = [
+        "~V|FIEBDC-3/2020|multiCAD-MCP AECO Edition||",
+        "~K|21.00|13.00|6.00|0.00|0.00|0|EUR|",
+        "~C|OBRA##|ud|PROYECTO CAD - MEDICIONES AUTOMATICAS|0.00|0|1|",
+        "~D|OBRA##|CAP01##\\1.000\\|",
+        "~C|CAP01##|ud|CAPITULO DE EDIFICACION Y MEDICIONES CAD|0.00|0|1|",
+    ]
+
+    breakdown_d = []
+    item_idx = 1
+    total_area = 0.0
+
+    for h in handles:
+        info = (
+            adapter.get_entity_area(h)
+            if hasattr(adapter, "get_entity_area")
+            else {}
+        )
+        a = float(info.get("area", 0.0))
+        p = float(info.get("perimeter", 0.0))
+        layer = info.get("layer", "0")
+        if a > 0.0:
+            total_area += a
+            code = f"MED{item_idx:03d}##"
+            breakdown_d.append(f"{code}\\1.000\\")
+            bc3_lines.append(f"~C|{code}|m2|Medicion CAD Recinto Capa {layer}|0.00|0|2|")
+            bc3_lines.append(
+                f"~M|CAP01##\\{code}|1|{a:.2f}|1|{a:.2f}|1.00|1.00|Recinto handle #{h} (Perim: {p:.2f}m)|"
+            )
+            item_idx += 1
+
+    if breakdown_d:
+        bc3_lines.insert(5, f"~D|CAP01##|{''.join(breakdown_d)}|")
+
+    os.makedirs(output_dir, exist_ok=True)
+    with open(target_path, "w", encoding="latin-1", errors="replace") as f:
+        f.write("\r\n".join(bc3_lines) + "\r\n")
+
+    return json.dumps(
+        {
+            "success": True,
+            "count": len(breakdown_d),
+            "total_area": round(total_area, 2),
+            "message": (
+                f"Exported {len(breakdown_d)} CAD measurements to FIEBDC-3 "
+                f"format at {clean_filename}"
+            ),
+            "path": str(target_path),
+        },
+        indent=2,
+    )
+
+
+def _export_pdf(adapter, filename: str, paper_size: str = "A3") -> str:
+    """Plot CAD drawing directly to vector PDF format."""
+    from core.config import get_config
+
+    config = get_config()
+    output_dir = Path(config.output.directory).expanduser().resolve()
+    clean_filename = (
+        filename if filename.lower().endswith(".pdf") else f"{filename}.pdf"
+    )
+    target_path = output_dir / clean_filename
+
+    if hasattr(adapter, "plot_to_pdf"):
+        res = adapter.plot_to_pdf(str(target_path), paper_size=paper_size)
+    else:
+        res = {"success": False, "error": "Adapter does not support vector PDF plotting"}
+
+    return json.dumps(res, indent=2)
+
+
 # ========== Tool Registration ==========
 
 
@@ -161,6 +253,7 @@ def register_export_tools(mcp):
         scope: str = "all",
         format: str = "json",
         filename: str = "drawing_data.xlsx",
+        paper_size: str = "A3",
     ) -> str:
         """
         Extract or export drawing data.
@@ -172,22 +265,12 @@ def register_export_tools(mcp):
             format: Output format.
                     - "json": return data as JSON (for analysis by the LLM)
                     - "excel": save to Excel file
-            filename: Excel filename (only used when format="excel").
-                      Default: "[drawing_name]_data.xlsx" (or "drawing_data.xlsx" if unnamed).
-                      Saved to the configured output directory.
-
-
-        Returns:
-            JSON result with entity data or export status
-
-        Examples:
-            scope="all", format="json"              → extract all entities as JSON
-            scope="all", format="excel"             → export all to Excel
-            scope="selected", format="json"         → extract selected as JSON
-            scope="selected", format="excel", filename="selection.xlsx"
-
-        Data columns: Handle, ObjectType, Layer, Color, Length, Area,
-                      Radius, Circumference, Name
+                    - "bc3": save to FIEBDC-3 Spanish budget format
+                    - "pdf": plot drawing to standalone vector PDF
+            filename: Output filename.
+                      Default: "drawing_data.xlsx", "drawing.bc3", or "drawing.pdf".
+                      Saved to configured output directory.
+            paper_size: Paper size when format="pdf" (A4, A3, A2, A1, A0). Default: "A3".
         """
         adapter = get_current_adapter()
         scope_lower = scope.lower()
@@ -202,14 +285,30 @@ def register_export_tools(mcp):
                 },
                 indent=2,
             )
-        if format_lower not in ("json", "excel"):
+        if format_lower not in ("json", "excel", "bc3", "pdf"):
             return json.dumps(
                 {
                     "success": False,
-                    "error": f"Unknown format '{format}'. Use: json, excel",
+                    "error": f"Unknown format '{format}'. Use: json, excel, bc3, pdf",
                 },
                 indent=2,
             )
+
+        if format_lower == "pdf":
+            pdf_filename = (
+                filename
+                if filename.lower().endswith(".pdf")
+                else f"{Path(filename).stem}.pdf"
+            )
+            return _export_pdf(adapter, pdf_filename, paper_size=paper_size)
+
+        if format_lower == "bc3":
+            bc3_filename = (
+                filename
+                if filename.lower().endswith(".bc3")
+                else f"{Path(filename).stem}.bc3"
+            )
+            return _export_bc3(adapter, bc3_filename)
 
         if format_lower == "excel" and filename == "drawing_data.xlsx":
             try:
