@@ -411,9 +411,19 @@ class DrawingMixin:
         boundary_polyline.Closed = True
 
         # Create hatch
+        pname = pattern.strip().upper()
+        # 1 = Predefined (standard hatch library like ANSI31, AR-CONC), 0 = User defined
+        ptype = 1 if pname != "SOLID" else 1
         hatch = document.ModelSpace.AddHatch(
-            0, pattern, True
-        )  # 0 = Normal, True = Associative
+            ptype, pname, True
+        )  # Associative
+        if pname != "SOLID":
+            try:
+                hatch.PatternScale = float(scale)
+                hatch.PatternAngle = math.radians(float(angle))
+            except Exception as e:
+                logger.warning(f"Could not set hatch scale/angle: {e}")
+
         hatch.AppendOuterLoop([boundary_polyline])
         hatch.Evaluate()
 
@@ -423,8 +433,8 @@ class DrawingMixin:
             color,
             0,
             "hatch",
-            False,  # hatch always refreshed in original
-            f"Created hatch with pattern {pattern}",
+            False,
+            f"Created hatch with pattern {pname}",
         )
 
     def add_dimension(

@@ -466,6 +466,192 @@ def _draw_table(spec: Dict[str, Any]) -> str:
     )
 
 
+def _draw_wall(spec: Dict[str, Any]) -> str:
+    """Draw a wall macro as a closed rectangular polyline with thickness."""
+    import math
+
+    p1 = parse_coordinate(spec["start"])
+    p2 = parse_coordinate(spec["end"])
+    thickness = float(spec.get("thickness", 0.15))
+    layer = str(spec.get("layer", "A-MURO-ESTR"))
+    color = spec.get("color", "red")
+
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return ""
+
+    half_th = thickness / 2.0
+    nx = (-dy / length) * half_th
+    ny = (dx / length) * half_th
+
+    c1 = (p1[0] + nx, p1[1] + ny)
+    c2 = (p2[0] + nx, p2[1] + ny)
+    c3 = (p2[0] - nx, p2[1] - ny)
+    c4 = (p1[0] - nx, p1[1] - ny)
+
+    adapter = get_current_adapter()
+    return adapter.draw_polyline(
+        [c1, c2, c3, c4],
+        closed=True,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+
+
+def _draw_door(spec: Dict[str, Any]) -> str:
+    """Draw an architectural door macro (leaf line + 90-degree swing arc)."""
+    import math
+
+    hinge = parse_coordinate(spec["hinge"])
+    width = float(spec.get("width", 0.82))
+    base_angle = float(spec.get("angle", 0.0))
+    layer = str(spec.get("layer", "A-CARP-PUER"))
+    color = spec.get("color", "green")
+
+    open_angle_rad = math.radians(base_angle + 90.0)
+    leaf_end = (
+        hinge[0] + width * math.cos(open_angle_rad),
+        hinge[1] + width * math.sin(open_angle_rad),
+    )
+
+    adapter = get_current_adapter()
+    leaf_handle = adapter.draw_line(
+        hinge, leaf_end, layer=layer, color=color, _skip_refresh=True
+    )
+    adapter.draw_arc(
+        hinge,
+        radius=width,
+        start_angle=base_angle,
+        end_angle=base_angle + 90.0,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+    return leaf_handle
+
+
+def _draw_window(spec: Dict[str, Any]) -> str:
+    """Draw an architectural window macro (frame outline + central glass line)."""
+    import math
+
+    p1 = parse_coordinate(spec["start"])
+    p2 = parse_coordinate(spec["end"])
+    thickness = float(spec.get("thickness", 0.10))
+    layer = str(spec.get("layer", "A-CARP-VENT"))
+    color = spec.get("color", "cyan")
+
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return ""
+
+    half_th = thickness / 2.0
+    nx = (-dy / length) * half_th
+    ny = (dx / length) * half_th
+
+    c1 = (p1[0] + nx, p1[1] + ny)
+    c2 = (p2[0] + nx, p2[1] + ny)
+    c3 = (p2[0] - nx, p2[1] - ny)
+    c4 = (p1[0] - nx, p1[1] - ny)
+
+    adapter = get_current_adapter()
+    frame_handle = adapter.draw_polyline(
+        [c1, c2, c3, c4],
+        closed=True,
+        layer=layer,
+        color=color,
+        _skip_refresh=True,
+    )
+    adapter.draw_line(p1, p2, layer=layer, color=color, _skip_refresh=True)
+    return frame_handle
+
+
+ARCHITECTURAL_HATCH_PATTERNS = {
+    "SOLID": "SOLID",
+    "ANSI31": "ANSI31",    # Ladrillo / Rayado oblicuo estándar (Brick / Masonry)
+    "ANSI32": "ANSI32",    # Acero (Steel)
+    "ANSI33": "ANSI33",    # Bronce / Latón (Bronze / Brass)
+    "ANSI37": "ANSI37",    # Plástico / Caucho (Plastic / Rubber)
+    "AR-CONC": "AR-CONC",  # Hormigón armado (Concrete)
+    "AR-SAND": "AR-SAND",  # Arena / Aislamiento fino (Sand)
+    "GRAVEL": "GRAVEL",    # Grava / Áridos (Gravel)
+    "EARTH": "EARTH",      # Terreno natural (Earth)
+    "HONEY": "HONEY",      # Panal hexagonal (Honeycomb)
+    "DOTS": "DOTS",        # Puntos (Dots)
+    "CROSS": "CROSS",      # Retícula ortogonal
+}
+
+HATCH_PATTERN_ALIASES = {
+    "LADRILLO": "ANSI31",
+    "BRICK": "ANSI31",
+    "RAYADO": "ANSI31",
+    "ACERO": "ANSI32",
+    "STEEL": "ANSI32",
+    "HORMIGON": "AR-CONC",
+    "CONCRETE": "AR-CONC",
+    "HORMIGÓN": "AR-CONC",
+    "ARENA": "AR-SAND",
+    "SAND": "AR-SAND",
+    "GRAVA": "GRAVEL",
+    "GRAVEL": "GRAVEL",
+    "TIERRA": "EARTH",
+    "EARTH": "EARTH",
+    "TERRENO": "EARTH",
+    "SOLIDO": "SOLID",
+    "SÓLIDO": "SOLID",
+}
+
+
+def _draw_hatch(spec: Dict[str, Any]) -> str:
+    """Draw a hatch entity with architectural pattern fill."""
+    raw_pattern = str(spec.get("pattern", "SOLID")).strip().upper()
+    pattern = HATCH_PATTERN_ALIASES.get(raw_pattern, raw_pattern)
+    scale = float(spec.get("scale", 1.0))
+    angle = float(spec.get("angle", 0.0))
+    color = spec.get("color", "white")
+    layer = spec.get("layer", "0")
+
+    adapter = get_current_adapter()
+
+    pts = []
+    if "points" in spec and spec["points"]:
+        points_val = spec["points"]
+        if isinstance(points_val, str):
+            pts = [parse_coordinate(p.strip()) for p in points_val.split(";") if p.strip()]
+        elif isinstance(points_val, list):
+            pts = [parse_coordinate(p) if isinstance(p, str) else p for p in points_val]
+    elif "boundary_handle" in spec and spec["boundary_handle"]:
+        h = spec["boundary_handle"]
+        if hasattr(adapter, "get_entity_info"):
+            try:
+                info = adapter.get_entity_info(h)
+                if info and "coordinates" in info:
+                    pts = info["coordinates"]
+            except Exception:
+                pass
+        if not pts and hasattr(adapter, "doc") and hasattr(adapter.doc, "entitydb"):
+            e = adapter.doc.entitydb.get(h)
+            if e and e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                pts = [(float(p[0]), float(p[1])) for p in e.get_points()]
+
+    if not pts:
+        raise ValueError("Hatch requires valid 'points' (e.g. '0,0;10,0;10,10;0,10') or 'boundary_handle'.")
+
+    return adapter.draw_hatch(
+        boundary_points=pts,
+        pattern=pattern,
+        scale=scale,
+        angle=angle,
+        color=color,
+        layer=layer,
+        _skip_refresh=True,
+    )
+
+
 # Dispatch table: type name -> (handler, required_fields)
 ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "line": (_draw_line, ["start", "end"]),
@@ -480,6 +666,10 @@ ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "leader": (_draw_leader_unified, ["points"]),
     "mleader": (_draw_leader_unified, ["leader_groups"]),
     "table": (_draw_table, ["insertion_point", "num_rows", "num_cols"]),
+    "wall": (_draw_wall, ["start", "end"]),
+    "door": (_draw_door, ["hinge"]),
+    "window": (_draw_window, ["start", "end"]),
+    "hatch": (_draw_hatch, ["points"]),
 }
 
 
@@ -487,6 +677,8 @@ def _validate_required_fields(
     spec: Dict[str, Any], required: List[str], entity_type: str
 ) -> Optional[str]:
     """Check required fields are present. Returns error message or None."""
+    if entity_type == "hatch" and ("points" in spec or "boundary_handle" in spec):
+        return None
     missing = [f for f in required if f not in spec]
     if missing:
         return f"{entity_type} requires fields: {', '.join(missing)}"
