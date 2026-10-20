@@ -831,6 +831,108 @@ class CADInterface(ABC):
         """
         pass
 
+    def zoom_window(self, corner1: Coordinate, corner2: Coordinate) -> bool:
+        """Zoom view to fit bounding box defined by corner1 and corner2."""
+        return True
+
+    def zoom_center(self, center: Coordinate, magnification: float = 1.0) -> bool:
+        """Zoom view centered on coordinate with specified magnification."""
+        return True
+
+    def set_view_preset(self, preset: str) -> bool:
+        """Set orthographic or isometric 3D view preset (top, front, iso_se, etc.)."""
+        return True
+
+    def set_visual_style(self, style: str) -> bool:
+        """Set visual style (wireframe, 2d, conceptual, realistic, shaded)."""
+        return True
+
+    def undo(self, count: int = 1) -> bool:
+        """Undo last action(s)."""
+        return True
+
+    def redo(self, count: int = 1) -> bool:
+        """Redo last undone action(s)."""
+        return True
+
+    def plot_to_pdf(
+        self, filepath: str, paper_size: str = "A3", monochrome: bool = False
+    ) -> Dict[str, Any]:
+        """Plot CAD drawing directly to a vector PDF document."""
+        return {"success": True, "path": filepath, "paper_size": paper_size}
+
+    # ========== Human-in-the-Loop Interaction ==========
+
+    def prompt_point(
+        self, prompt: str = "Select point:", base_point: Optional[Coordinate] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick a point with crosshair."""
+        return {"success": True, "point": (0.0, 0.0, 0.0), "interactive": False}
+
+    def prompt_entity(
+        self, prompt: str = "Select entity:"
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick an entity."""
+        return {"success": True, "handle": "", "type": "", "interactive": False}
+
+    def prompt_distance(
+        self, prompt: str = "Specify distance:", base_point: Optional[Coordinate] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to specify or measure a distance."""
+        return {"success": True, "distance": 1.0, "interactive": False}
+
+    def prompt_string(
+        self, prompt: str = "Enter string:", has_spaces: bool = True
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD command line to enter text string."""
+        return {"success": True, "string": "", "interactive": False}
+
+    # ========== BIM Semantic Metadata (XDATA) ==========
+
+    def set_entity_metadata(self, handle: str, metadata: Dict[str, Any]) -> bool:
+        """Attach BIM or extended semantic properties to entity."""
+        return True
+
+    def get_entity_metadata(self, handle: str) -> Dict[str, Any]:
+        """Retrieve attached BIM or extended semantic properties from entity."""
+        return {}
+
+    # ========== External References (XREF) & Raster Images ==========
+
+    def attach_xref(
+        self,
+        filepath: str,
+        block_name: Optional[str] = None,
+        insertion_point: Coordinate = (0.0, 0.0),
+        scale: float = 1.0,
+        rotation: float = 0.0,
+        overlay: bool = True,
+    ) -> Dict[str, Any]:
+        """Attach external DWG reference."""
+        return {"success": True, "name": block_name or "", "path": filepath}
+
+    def attach_raster(
+        self,
+        filepath: str,
+        insertion_point: Coordinate = (0.0, 0.0),
+        scale: float = 1.0,
+        rotation: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Attach raster image or orthophoto."""
+        return {"success": True, "path": filepath}
+
+    def list_xrefs(self) -> List[Dict[str, Any]]:
+        """List active external references in the drawing."""
+        return []
+
+    def reload_xref(self, name: str) -> bool:
+        """Reload external reference by name."""
+        return True
+
+    def detach_xref(self, name: str) -> bool:
+        """Detach external reference by name."""
+        return True
+
     # ========== Entity Management ==========
 
     @abstractmethod
@@ -1126,7 +1228,291 @@ class CADInterface(ABC):
         """
         pass
 
+    def offset_entity(
+        self, handle: str, distance: float, side_point: Optional[Coordinate] = None
+    ) -> List[str]:
+        """
+        Create a parallel offset of an entity.
+
+        Args:
+            handle: Entity handle
+            distance: Offset distance (positive or negative)
+            side_point: Optional side probe point
+
+        Returns:
+            List[str]: Handles of newly created offset entities
+        """
+        return []
+
+    def fillet_entities(
+        self, handle1: str, handle2: str, radius: float = 0.0
+    ) -> Optional[str]:
+        """
+        Fillet/join two entities with a given radius (0 for sharp join).
+
+        Args:
+            handle1: First entity handle
+            handle2: Second entity handle
+            radius: Corner fillet radius (default: 0.0)
+
+        Returns:
+            Optional[str]: Handle of filleted/connected entity
+        """
+        return None
+
+    def chamfer_entities(
+        self, handle1: str, handle2: str, dist1: float = 0.0, dist2: float = 0.0
+    ) -> Optional[str]:
+        """
+        Chamfer/bevel two intersecting lines.
+
+        Args:
+            handle1: First entity handle
+            handle2: Second entity handle
+            dist1: First setback distance
+            dist2: Second setback distance
+
+        Returns:
+            Optional[str]: Handle of created chamfer line
+        """
+        return None
+
+    def explode_entity(self, handle: str) -> List[str]:
+        """
+        Explode a block reference or polyline into component primitives.
+
+        Args:
+            handle: Entity handle to explode
+
+        Returns:
+            List[str]: Handles of resulting primitive entities
+        """
+        return []
+
+    def match_properties(self, source_handle: str, target_handles: List[str]) -> bool:
+        """
+        Copy layer, color, linetype, and lineweight from source entity to targets.
+
+        Args:
+            source_handle: Template entity handle
+            target_handles: List of target entity handles
+
+        Returns:
+            bool: True if successful
+        """
+        return True
+
+    def create_boundary(
+        self, internal_point: Coordinate, layer: str = "0"
+    ) -> Optional[str]:
+        """
+        Detect surrounding closed boundary around internal point and create polyline.
+
+        Args:
+            internal_point: Probe point (x, y) inside room
+            layer: Destination layer for boundary polyline
+
+        Returns:
+            Optional[str]: Handle of created boundary polyline
+        """
+        return None
+
+    def join_entities(
+        self, handles: List[str], tolerance: float = 0.01
+    ) -> Optional[str]:
+        """
+        Join loose connected lines and arcs into a continuous polyline.
+
+        Args:
+            handles: List of entity handles to join
+            tolerance: Maximum gap distance to bridge (default: 0.01)
+
+        Returns:
+            Optional[str]: Handle of joined polyline
+        """
+        return None
+
+    def trim_extend_entity(
+        self, handle: str, boundary_handle: str, mode: str = "trim"
+    ) -> bool:
+        """
+        Trim or extend a line against a boundary cutting edge.
+
+        Args:
+            handle: Line to trim/extend
+            boundary_handle: Boundary/cutting line
+            mode: "trim" or "extend"
+
+        Returns:
+            bool: True if successful
+        """
+        return False
+
+    # ========== Layout & Paperspace Management ==========
+
+    def list_layouts(self) -> List[Dict[str, Any]]:
+        """
+        List all presentation layouts in the active drawing.
+
+        Returns:
+            List[Dict[str, Any]]: Information on layouts (name, active, modelspace)
+        """
+        return []
+
+    def create_layout(
+        self,
+        name: str,
+        paper_size: str = "A3",
+        orientation: str = "landscape",
+        margins: Tuple[float, float, float, float] = (10.0, 10.0, 10.0, 10.0),
+    ) -> Dict[str, Any]:
+        """
+        Create a new paperspace presentation layout.
+
+        Args:
+            name: Layout name
+            paper_size: Standard paper size (A4, A3, A2, A1, A0, etc.)
+            orientation: "landscape" or "portrait"
+            margins: (left, bottom, right, top) in mm
+
+        Returns:
+            Dict[str, Any]: Layout metadata
+        """
+        return {"success": False, "error": "Not implemented"}
+
+    def activate_layout(self, name: str) -> bool:
+        """
+        Activate a layout by name.
+
+        Args:
+            name: Layout name
+
+        Returns:
+            bool: True if activated successfully
+        """
+        return False
+
+    def delete_layout(self, name: str) -> bool:
+        """
+        Delete a layout by name.
+
+        Args:
+            name: Layout name
+
+        Returns:
+            bool: True if deleted
+        """
+        return False
+
+    def add_viewport(
+        self,
+        layout_name: str,
+        center: Tuple[float, float],
+        width: float,
+        height: float,
+        view_center: Tuple[float, float] = (0.0, 0.0),
+        scale: str = "1:50",
+        unit: str = "m",
+    ) -> Optional[str]:
+        """
+        Add a modelspace viewport to a paperspace layout.
+
+        Args:
+            layout_name: Target layout
+            center: Viewport center point (x, y) on paper in mm
+            width: Viewport width in mm
+            height: Viewport height in mm
+            view_center: Model center to focus (x, y) in model units
+            scale: Architectural scale (e.g. "1:50", "1:100")
+            unit: Model units ("m" or "mm")
+
+        Returns:
+            Optional[str]: Handle of created viewport
+        """
+        return None
+
+    def add_titleblock(
+        self,
+        layout_name: str,
+        title: str,
+        author: str = "",
+        date: str = "",
+        scale: str = "1:50",
+        sheet_number: str = "1/1",
+        paper_size: str = "A3",
+        orientation: str = "landscape",
+    ) -> Dict[str, Any]:
+        """
+        Insert standardized AECO title block into layout.
+
+        Args:
+            layout_name: Target layout
+            title: Sheet title
+            author: Author/technician
+            date: Date string
+            scale: Scale string
+            sheet_number: Sheet number
+            paper_size: Paper size for placement calculations
+            orientation: Orientation
+
+        Returns:
+            Dict[str, Any]: Title block metadata
+        """
+        return {"success": False, "error": "Not implemented"}
+
+    # ========== Semantic Text Search & Replace ==========
+
+    def find_text_entities(
+        self,
+        search_pattern: str,
+        layer: Optional[str] = None,
+        case_sensitive: bool = False,
+        use_regex: bool = False,
+        handles: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Find text entities (TEXT, MTEXT, ATTRIB) matching search pattern.
+
+        Args:
+            search_pattern: Text substring or regex pattern
+            layer: Optional layer name filter
+            case_sensitive: Whether match is case sensitive
+            use_regex: Whether pattern is a regular expression
+            handles: Optional list of handles to restrict search
+
+        Returns:
+            List[Dict[str, Any]]: List of matching entities with text, handle, layer
+        """
+        return []
+
+    def replace_text_entities(
+        self,
+        search_pattern: str,
+        replacement: str,
+        layer: Optional[str] = None,
+        case_sensitive: bool = False,
+        use_regex: bool = False,
+        handles: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Batch find and replace text across drawing entities.
+
+        Args:
+            search_pattern: Text substring or regex to replace
+            replacement: New text replacement string
+            layer: Optional layer filter
+            case_sensitive: Case sensitive replacement
+            use_regex: Use regex substitution
+            handles: Optional list of handles to restrict replacement
+
+        Returns:
+            Dict[str, Any]: Replacement statistics and modified entities details
+        """
+        return {"success": False, "count": 0, "replacements": []}
+
     # ========== Utility Methods ==========
+
+
 
     @staticmethod
     def normalize_coordinate(coord: Coordinate) -> Point:

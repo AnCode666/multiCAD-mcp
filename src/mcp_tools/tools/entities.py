@@ -300,6 +300,559 @@ def _delete(spec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _area(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate area and perimeter for entities.
+
+    Args:
+        spec: Operation spec with optional keys: handles (str or list), layer (str).
+
+    Returns:
+        Dict with keys: success (bool), count (int), total_area (float), total_perimeter (float), items (list), detail (str).
+    """
+    adapter = get_current_adapter()
+    handles_to_check: List[str] = []
+
+    layer_filter = spec.get("layer")
+    if layer_filter:
+        handles_to_check = adapter.select_by_layer(str(layer_filter).strip())
+    else:
+        handles_raw = spec.get("handles", "")
+        if handles_raw and handles_raw != "all":
+            if isinstance(handles_raw, list):
+                handles_to_check = [str(h).strip() for h in handles_raw if str(h).strip()]
+            else:
+                handles_to_check = parse_handles(str(handles_raw))
+        else:
+            selected = adapter.get_selected_entities()
+            if selected:
+                handles_to_check = selected
+            else:
+                handles_to_check = (
+                    adapter.select_by_type("LWPOLYLINE")
+                    + adapter.select_by_type("POLYLINE")
+                    + adapter.select_by_type("CIRCLE")
+                )
+
+    if not handles_to_check:
+        return {
+            "success": True,
+            "count": 0,
+            "total_area": 0.0,
+            "total_perimeter": 0.0,
+            "items": [],
+            "detail": "No entities found to calculate area",
+        }
+
+    items = []
+    total_area = 0.0
+    total_perimeter = 0.0
+
+    for h in handles_to_check:
+        if hasattr(adapter, "get_entity_area"):
+            info = adapter.get_entity_area(h)
+        else:
+            info = {"handle": h, "area": 0.0, "perimeter": 0.0, "layer": "0"}
+        area_val = float(info.get("area", 0.0))
+        perim_val = float(info.get("perimeter", 0.0))
+        if area_val > 0.0 or perim_val > 0.0:
+            total_area += area_val
+            total_perimeter += perim_val
+            items.append({
+                "handle": h,
+                "layer": info.get("layer", "0"),
+                "type": info.get("object_name", "Entity"),
+                "area": round(area_val, 2),
+                "perimeter": round(perim_val, 2),
+            })
+
+    return {
+        "success": True,
+        "count": len(items),
+        "total_area": round(total_area, 2),
+        "total_perimeter": round(total_perimeter, 2),
+        "unit": "m²",
+        "items": items,
+        "detail": (
+            f"Calculated areas for {len(items)} entities. "
+            f"Total Area: {total_area:.2f} m², Total Perimeter: {total_perimeter:.2f} m"
+        ),
+    }
+
+
+def _area_table(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a CAD Area Schedule Table (Cuadro de Superficies) from closed entities.
+
+    Args:
+        spec: Operation spec with keys:
+            - insertion_point (str or tuple, default "0,0")
+            - layer (str, default "0")
+            - title (str, default "CUADRO DE SUPERFICIES ÚTILES")
+            - row_height (float, default 8.0)
+            - col_width (float, default 40.0)
+
+    Returns:
+        Dict with keys: success (bool), table_handle (str), spaces_count (int), total_area (float), total_perimeter (float), detail (str).
+    """
+    adapter = get_current_adapter()
+    target_layer = str(spec.get("layer", "0")).strip()
+
+    if target_layer and target_layer != "0":
+        handles = adapter.select_by_layer(target_layer)
+    else:
+        handles = (
+            adapter.select_by_type("LWPOLYLINE")
+            + adapter.select_by_type("POLYLINE")
+            + adapter.select_by_type("CIRCLE")
+        )
+
+    if not handles:
+        return {
+            "success": False,
+            "error": f"No measurable entities found on layer '{target_layer}'",
+        }
+
+    items = []
+    total_area = 0.0
+    total_perimeter = 0.0
+
+    for h in handles:
+        if hasattr(adapter, "get_entity_area"):
+            info = adapter.get_entity_area(h)
+        else:
+            info = {"handle": h, "area": 0.0, "perimeter": 0.0, "layer": target_layer}
+        a = float(info.get("area", 0.0))
+        p = float(info.get("perimeter", 0.0))
+        if a > 0.0:
+            total_area += a
+            total_perimeter += p
+            items.append({
+                "handle": h,
+                "layer": info.get("layer", target_layer),
+                "area": a,
+                "perimeter": p,
+            })
+
+    if not items:
+        return {
+            "success": False,
+            "error": "No closed spaces with area > 0 found",
+        }
+
+    title = str(spec.get("title", "CUADRO DE SUPERFICIES ÚTILES")).strip()
+    headers = ["Nº", "Recinto / Capa", "Perímetro (m)", "Superficie (m²)", "% Total"]
+
+    data_rows: List[List[str]] = []
+    for idx, item in enumerate(items, 1):
+        pct = (item["area"] / total_area * 100.0) if total_area > 0 else 0.0
+        data_rows.append([
+            str(idx),
+            str(item["layer"]),
+            f"{item['perimeter']:.2f}",
+            f"{item['area']:.2f}",
+            f"{pct:.1f}%",
+        ])
+
+    # Summary row
+    data_rows.append([
+        "TOTAL",
+        "-",
+        f"{total_perimeter:.2f}",
+        f"{total_area:.2f}",
+        "100.0%",
+    ])
+
+    raw_ins = spec.get("insertion_point", "0,0")
+    if isinstance(raw_ins, (list, tuple)):
+        ins_pt = (float(raw_ins[0]), float(raw_ins[1]))
+    else:
+        parts = str(raw_ins).split(",")
+        ins_pt = (
+            float(parts[0].strip()) if len(parts) > 0 else 0.0,
+            float(parts[1].strip()) if len(parts) > 1 else 0.0,
+        )
+
+    row_h = float(spec.get("row_height", 8.0))
+    col_w = float(spec.get("col_width", 40.0))
+
+    try:
+        table_handle = adapter.draw_table(
+            insertion_point=ins_pt,
+            num_rows=len(data_rows) + 2,  # +1 title, +1 headers
+            num_cols=5,
+            row_height=row_h,
+            col_width=col_w,
+            data=data_rows,
+            title=title,
+            headers=headers,
+            layer="A-ANNO-TABL",
+            color="white",
+        )
+        return {
+            "success": True,
+            "table_handle": table_handle,
+            "spaces_count": len(items),
+            "total_area": round(total_area, 2),
+            "total_perimeter": round(total_perimeter, 2),
+            "detail": (
+                f"Generated CAD table '{title}' at {ins_pt} with {len(items)} spaces. "
+                f"Total Area: {total_area:.2f} m²"
+            ),
+        }
+    except Exception as e:
+        logger.error(f"Failed to draw area schedule table: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def _audit(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Audit drawing entities for CAD Quality Assurance (QA).
+
+    Checks:
+    - Entities drawn on layer '0'
+    - Identifies basic drawing structure health
+
+    Returns:
+        Dict with keys: success (bool), qa_score (int), issues_count (int), issues (list), detail (str).
+    """
+    adapter = get_current_adapter()
+    entities_layer_0 = adapter.select_by_layer("0")
+
+    issues = []
+    if entities_layer_0:
+        issues.append({
+            "type": "layer_0_entities",
+            "severity": "warning",
+            "count": len(entities_layer_0),
+            "detail": (
+                f"{len(entities_layer_0)} entities found on layer '0'. "
+                "Best practice is to assign specific semantic layers."
+            ),
+            "handles": entities_layer_0[:10],
+        })
+
+    deductions = len(entities_layer_0) * 2
+    score = max(0, 100 - min(deductions, 100))
+
+    return {
+        "success": True,
+        "qa_score": score,
+        "issues_count": len(issues),
+        "issues": issues,
+        "detail": (
+            f"CAD QA Audit complete. Quality Score: {score}/100. "
+            f"Issues detected: {len(issues)}."
+        ),
+    }
+
+
+def _set_metadata(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach BIM / semantic metadata to entity handle."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("handles", "")).strip()
+    if not handle:
+        return {"success": False, "error": "Missing 'handle'"}
+
+    key = spec.get("key")
+    val = spec.get("value")
+    metadata = spec.get("metadata")
+
+    data = {}
+    if metadata:
+        if isinstance(metadata, str):
+            try:
+                data = json.loads(metadata)
+            except Exception:
+                data = {"data": metadata}
+        elif isinstance(metadata, dict):
+            data = metadata
+    elif key is not None:
+        data = {str(key): val}
+
+    if hasattr(adapter, "set_entity_metadata"):
+        adapter.set_entity_metadata(handle, data)
+        return {
+            "success": True,
+            "handle": handle,
+            "metadata": data,
+            "detail": f"Attached metadata to entity #{handle}",
+        }
+    return {"success": False, "error": "Adapter does not support metadata attachment"}
+
+
+def _get_metadata(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Retrieve BIM / semantic metadata from entity handle."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("handles", "")).strip()
+    if not handle:
+        return {"success": False, "error": "Missing 'handle'"}
+
+    if hasattr(adapter, "get_entity_metadata"):
+        data = adapter.get_entity_metadata(handle)
+        return {"success": True, "handle": handle, "metadata": data}
+    return {"success": False, "error": "Adapter does not support metadata retrieval"}
+
+
+def _offset(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Offset an entity parallel to itself by distance."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("handles", "")).strip()
+    distance = float(spec.get("distance", 1.0))
+    side_point = spec.get("side_point")
+
+    if not hasattr(adapter, "offset_entity"):
+        return {"success": False, "error": "Adapter does not support offset operation"}
+
+    new_handles = adapter.offset_entity(handle, distance, side_point=side_point)
+    return {
+        "success": bool(new_handles),
+        "source_handle": handle,
+        "distance": distance,
+        "new_handles": new_handles,
+        "count": len(new_handles),
+    }
+
+
+def _fillet(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Fillet two entities with radius (0.0 for sharp corner join)."""
+    adapter = get_current_adapter()
+    handles_raw = spec.get("handles") or spec.get("handle", "")
+    if isinstance(handles_raw, list):
+        handle_list = [str(h).strip() for h in handles_raw]
+    else:
+        handle_list = [h.strip() for h in str(handles_raw).split(",") if h.strip()]
+
+    if len(handle_list) < 2:
+        return {"success": False, "error": "'fillet' requires two entity handles (e.g. 'A1,B2')"}
+
+    radius = float(spec.get("radius", 0.0))
+    if not hasattr(adapter, "fillet_entities"):
+        return {"success": False, "error": "Adapter does not support fillet operation"}
+
+    res = adapter.fillet_entities(handle_list[0], handle_list[1], radius=radius)
+    return {
+        "success": bool(res),
+        "handle1": handle_list[0],
+        "handle2": handle_list[1],
+        "radius": radius,
+        "result": res,
+    }
+
+
+def _chamfer(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Chamfer two intersecting entities with setback distances."""
+    adapter = get_current_adapter()
+    handles_raw = spec.get("handles") or spec.get("handle", "")
+    if isinstance(handles_raw, list):
+        handle_list = [str(h).strip() for h in handles_raw]
+    else:
+        handle_list = [h.strip() for h in str(handles_raw).split(",") if h.strip()]
+
+    if len(handle_list) < 2:
+        return {"success": False, "error": "'chamfer' requires two entity handles (e.g. 'A1,B2')"}
+
+    dist1 = float(spec.get("dist1") or spec.get("distance1", 0.5))
+    dist2 = float(spec.get("dist2") or spec.get("distance2", dist1))
+
+    if not hasattr(adapter, "chamfer_entities"):
+        return {"success": False, "error": "Adapter does not support chamfer operation"}
+
+    res = adapter.chamfer_entities(handle_list[0], handle_list[1], dist1=dist1, dist2=dist2)
+    return {
+        "success": bool(res),
+        "handle1": handle_list[0],
+        "handle2": handle_list[1],
+        "dist1": dist1,
+        "dist2": dist2,
+        "result": res,
+    }
+
+
+def _explode(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Explode polyline or block reference into component primitives."""
+    adapter = get_current_adapter()
+    handles_raw = spec.get("handles") or spec.get("handle", "")
+    if isinstance(handles_raw, list):
+        handle_list = [str(h).strip() for h in handles_raw]
+    else:
+        handle_list = [h.strip() for h in str(handles_raw).split(",") if h.strip()]
+
+    if not handle_list:
+        return {"success": False, "error": "Missing entity handles to explode"}
+
+    if not hasattr(adapter, "explode_entity"):
+        return {"success": False, "error": "Adapter does not support explode operation"}
+
+    all_new = []
+    for h in handle_list:
+        res = adapter.explode_entity(h)
+        all_new.extend(res)
+
+    return {
+        "success": bool(all_new),
+        "exploded_handles": handle_list,
+        "new_handles": all_new,
+        "count": len(all_new),
+    }
+
+
+def _matchprop(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Match properties from source entity to target entities."""
+    adapter = get_current_adapter()
+    src = str(spec.get("source_handle") or spec.get("source", "")).strip()
+    targets_raw = spec.get("target_handles") or spec.get("targets") or spec.get("handles", "")
+    if isinstance(targets_raw, list):
+        target_list = [str(h).strip() for h in targets_raw]
+    else:
+        target_list = [h.strip() for h in str(targets_raw).split(",") if h.strip()]
+
+    if not src or not target_list:
+        return {"success": False, "error": "'matchprop' requires 'source_handle' and 'target_handles'"}
+
+    if not hasattr(adapter, "match_properties"):
+        return {"success": False, "error": "Adapter does not support match_properties operation"}
+
+    success = adapter.match_properties(src, target_list)
+    return {
+        "success": success,
+        "source_handle": src,
+        "target_count": len(target_list),
+    }
+
+
+def _boundary(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a boundary polyline around an internal coordinate."""
+    adapter = get_current_adapter()
+    point_raw = spec.get("point") or spec.get("internal_point") or spec.get("coords") or "0,0"
+    from mcp_tools.helpers import parse_coordinate
+    pt = parse_coordinate(point_raw)
+    layer = spec.get("layer", "A-BOUND")
+
+    if not hasattr(adapter, "create_boundary"):
+        return {"success": False, "error": "Adapter does not support boundary creation"}
+
+    handle = adapter.create_boundary(pt, layer=layer)
+    return {
+        "success": bool(handle),
+        "handle": handle,
+        "probe_point": pt,
+        "layer": layer,
+    }
+
+
+def _join(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Join loose connected lines/arcs into a continuous polyline."""
+    adapter = get_current_adapter()
+    handles_raw = spec.get("handles") or spec.get("handle", "")
+    if isinstance(handles_raw, list):
+        handle_list = [str(h).strip() for h in handles_raw]
+    else:
+        handle_list = [h.strip() for h in str(handles_raw).split(",") if h.strip()]
+
+    if len(handle_list) < 2:
+        return {"success": False, "error": "'join' requires at least two entity handles (e.g. 'A1,B2')"}
+
+    tolerance = float(spec.get("tolerance", 0.05))
+    if not hasattr(adapter, "join_entities"):
+        return {"success": False, "error": "Adapter does not support join operation"}
+
+    res = adapter.join_entities(handle_list, tolerance=tolerance)
+    return {
+        "success": bool(res),
+        "handle": res,
+        "joined_count": len(handle_list),
+        "tolerance": tolerance,
+    }
+
+
+def _trim(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Trim a line against a boundary cutting edge."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("target", "")).strip()
+    boundary = str(spec.get("boundary") or spec.get("cutting_edge") or spec.get("boundary_handle", "")).strip()
+
+    if not handle or not boundary:
+        return {"success": False, "error": "'trim' requires 'handle' and 'boundary'"}
+
+    if not hasattr(adapter, "trim_extend_entity"):
+        return {"success": False, "error": "Adapter does not support trim operation"}
+
+    success = adapter.trim_extend_entity(handle, boundary, mode="trim")
+    return {"success": success, "handle": handle, "boundary": boundary, "mode": "trim"}
+
+
+def _extend(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Extend a line to touch a boundary edge."""
+    adapter = get_current_adapter()
+    handle = str(spec.get("handle") or spec.get("target", "")).strip()
+    boundary = str(spec.get("boundary") or spec.get("boundary_handle", "")).strip()
+
+    if not handle or not boundary:
+        return {"success": False, "error": "'extend' requires 'handle' and 'boundary'"}
+
+    if not hasattr(adapter, "trim_extend_entity"):
+        return {"success": False, "error": "Adapter does not support extend operation"}
+
+    success = adapter.trim_extend_entity(handle, boundary, mode="extend")
+    return {"success": success, "handle": handle, "boundary": boundary, "mode": "extend"}
+
+
+def _find_text(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Find text entities matching search pattern."""
+    adapter = get_current_adapter()
+    search = str(spec.get("find") or spec.get("search") or "").strip()
+    if not search:
+        return {"success": False, "error": "'find_text' requires 'find' parameter"}
+
+    layer = spec.get("layer")
+    case_sensitive = bool(spec.get("case_sensitive", False))
+    use_regex = bool(spec.get("regex", False))
+    handles_val = spec.get("handles")
+    target_handles = parse_handles(handles_val) if handles_val else None
+
+    if not hasattr(adapter, "find_text_entities"):
+        return {"success": False, "error": "Adapter does not support find_text_entities"}
+
+    matches = adapter.find_text_entities(
+        search_pattern=search,
+        layer=layer,
+        case_sensitive=case_sensitive,
+        use_regex=use_regex,
+        handles=target_handles,
+    )
+    return {
+        "success": True,
+        "count": len(matches),
+        "matches": matches,
+    }
+
+
+def _replace_text(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Batch find and replace text across drawing entities."""
+    adapter = get_current_adapter()
+    search = str(spec.get("find") or spec.get("search") or "").strip()
+    replace = str(spec.get("replace", ""))
+    if not search:
+        return {"success": False, "error": "'replace_text' requires 'find' parameter"}
+
+    layer = spec.get("layer")
+    case_sensitive = bool(spec.get("case_sensitive", False))
+    use_regex = bool(spec.get("regex", False))
+    handles_val = spec.get("handles")
+    target_handles = parse_handles(handles_val) if handles_val else None
+
+    if not hasattr(adapter, "replace_text_entities"):
+        return {"success": False, "error": "Adapter does not support replace_text_entities"}
+
+    res = adapter.replace_text_entities(
+        search_pattern=search,
+        replacement=replace,
+        layer=layer,
+        case_sensitive=case_sensitive,
+        use_regex=use_regex,
+        handles=target_handles,
+    )
+    return res
+
+
 # Dispatch table: action -> (handler, required_fields)
 ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "select": (_select, ["by", "value"]),
@@ -312,7 +865,25 @@ ENTITY_DISPATCH: Dict[str, Tuple[Callable, List[str]]] = {
     "copy": (_copy, ["handles"]),
     "paste": (_paste, ["base_point"]),
     "delete": (_delete, ["handles"]),
+    "area": (_area, []),
+    "area_table": (_area_table, []),
+    "audit": (_audit, []),
+    "set_metadata": (_set_metadata, []),
+    "get_metadata": (_get_metadata, []),
+    "offset": (_offset, []),
+    "fillet": (_fillet, []),
+    "chamfer": (_chamfer, []),
+    "explode": (_explode, []),
+    "matchprop": (_matchprop, []),
+    "boundary": (_boundary, []),
+    "join": (_join, []),
+    "trim": (_trim, []),
+    "extend": (_extend, []),
+    "find_text": (_find_text, []),
+    "replace_text": (_replace_text, []),
 }
+
+
 
 
 def _validate_required_fields(
@@ -360,6 +931,8 @@ def register_entity_tools(mcp):
                 copy|handles                  → copy|A1,B2
                 paste|base_point              → paste|100,200
                 delete|handles                → delete|A1,B2
+                area|handles                  → area|A1,B2 (or area|layer|A-ROOMS)
+                area_table|ins_x,ins_y|layer  → area_table|0,0|A-ROOMS|Cuadro Áreas
 
                 "handles" = comma-separated entity handles (e.g. "A1B2,C3D4")
                 "by" = "color", "layer", or "type"
@@ -367,6 +940,8 @@ def register_entity_tools(mcp):
                 Example:
                     select|layer|walls
                     move|A1B2,C3D4|10|5
+                    area|layer|A-ESTANCIAS
+                    area_table|100,100|A-ESTANCIAS|Cuadro de Superficies
                     set_color|A1B2,C3D4|red
 
                 JSON format also supported for backwards compatibility.
