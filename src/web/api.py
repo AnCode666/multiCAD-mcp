@@ -442,7 +442,6 @@ async def api_cad_entities(
             "Text": ["TEXT", "MTEXT"],
             "MText": ["MTEXT", "TEXT"],
             "Dimension": ["DIMENSION"],
-            "Spline": ["SPLINE"],
             "Point": ["POINT"],
             "Hatch": ["HATCH"],
         }

@@ -43,9 +43,12 @@ class TestPathTraversal:
             parent_dir = output_dir.parent
             traversal_path = (parent_dir / "dangerous.txt").resolve()
 
-            # Use pytest.raises with exception type only
-            with pytest.raises(Exception):  # Catch any exception
-                adapter._validate_export_path(traversal_path, output_dir)
+            mock_config = MagicMock()
+            mock_config.output.allow_arbitrary_paths = False
+            with patch("src.adapters.mixins.utility_mixin.ConfigManager") as mock_cm:
+                mock_cm.return_value.config = mock_config
+                with pytest.raises(Exception):  # Catch any exception
+                    adapter._validate_export_path(traversal_path, output_dir)
 
     def test_resolve_export_path_allows_safe_paths(self):
         """Test that resolve_export_path allows legitimate paths."""
