@@ -831,6 +831,108 @@ class CADInterface(ABC):
         """
         pass
 
+    def zoom_window(self, corner1: Coordinate, corner2: Coordinate) -> bool:
+        """Zoom view to fit bounding box defined by corner1 and corner2."""
+        return True
+
+    def zoom_center(self, center: Coordinate, magnification: float = 1.0) -> bool:
+        """Zoom view centered on coordinate with specified magnification."""
+        return True
+
+    def set_view_preset(self, preset: str) -> bool:
+        """Set orthographic or isometric 3D view preset (top, front, iso_se, etc.)."""
+        return True
+
+    def set_visual_style(self, style: str) -> bool:
+        """Set visual style (wireframe, 2d, conceptual, realistic, shaded)."""
+        return True
+
+    def undo(self, count: int = 1) -> bool:
+        """Undo last action(s)."""
+        return True
+
+    def redo(self, count: int = 1) -> bool:
+        """Redo last undone action(s)."""
+        return True
+
+    def plot_to_pdf(
+        self, filepath: str, paper_size: str = "A3", monochrome: bool = False
+    ) -> Dict[str, Any]:
+        """Plot CAD drawing directly to a vector PDF document."""
+        return {"success": True, "path": filepath, "paper_size": paper_size}
+
+    # ========== Human-in-the-Loop Interaction ==========
+
+    def prompt_point(
+        self, prompt: str = "Select point:", base_point: Optional[Coordinate] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick a point with crosshair."""
+        return {"success": True, "point": (0.0, 0.0, 0.0), "interactive": False}
+
+    def prompt_entity(
+        self, prompt: str = "Select entity:"
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to pick an entity."""
+        return {"success": True, "handle": "", "type": "", "interactive": False}
+
+    def prompt_distance(
+        self, prompt: str = "Specify distance:", base_point: Optional[Coordinate] = None
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD viewport to specify or measure a distance."""
+        return {"success": True, "distance": 1.0, "interactive": False}
+
+    def prompt_string(
+        self, prompt: str = "Enter string:", has_spaces: bool = True
+    ) -> Dict[str, Any]:
+        """Prompt user in CAD command line to enter text string."""
+        return {"success": True, "string": "", "interactive": False}
+
+    # ========== BIM Semantic Metadata (XDATA) ==========
+
+    def set_entity_metadata(self, handle: str, metadata: Dict[str, Any]) -> bool:
+        """Attach BIM or extended semantic properties to entity."""
+        return True
+
+    def get_entity_metadata(self, handle: str) -> Dict[str, Any]:
+        """Retrieve attached BIM or extended semantic properties from entity."""
+        return {}
+
+    # ========== External References (XREF) & Raster Images ==========
+
+    def attach_xref(
+        self,
+        filepath: str,
+        block_name: Optional[str] = None,
+        insertion_point: Coordinate = (0.0, 0.0),
+        scale: float = 1.0,
+        rotation: float = 0.0,
+        overlay: bool = True,
+    ) -> Dict[str, Any]:
+        """Attach external DWG reference."""
+        return {"success": True, "name": block_name or "", "path": filepath}
+
+    def attach_raster(
+        self,
+        filepath: str,
+        insertion_point: Coordinate = (0.0, 0.0),
+        scale: float = 1.0,
+        rotation: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Attach raster image or orthophoto."""
+        return {"success": True, "path": filepath}
+
+    def list_xrefs(self) -> List[Dict[str, Any]]:
+        """List active external references in the drawing."""
+        return []
+
+    def reload_xref(self, name: str) -> bool:
+        """Reload external reference by name."""
+        return True
+
+    def detach_xref(self, name: str) -> bool:
+        """Detach external reference by name."""
+        return True
+
     # ========== Entity Management ==========
 
     @abstractmethod
@@ -1126,7 +1228,82 @@ class CADInterface(ABC):
         """
         pass
 
+    def offset_entity(
+        self, handle: str, distance: float, side_point: Optional[Coordinate] = None
+    ) -> List[str]:
+        """
+        Create a parallel offset of an entity.
+
+        Args:
+            handle: Entity handle
+            distance: Offset distance (positive or negative)
+            side_point: Optional side probe point
+
+        Returns:
+            List[str]: Handles of newly created offset entities
+        """
+        return []
+
+    def fillet_entities(
+        self, handle1: str, handle2: str, radius: float = 0.0
+    ) -> Optional[str]:
+        """
+        Fillet/join two entities with a given radius (0 for sharp join).
+
+        Args:
+            handle1: First entity handle
+            handle2: Second entity handle
+            radius: Corner fillet radius (default: 0.0)
+
+        Returns:
+            Optional[str]: Handle of filleted/connected entity
+        """
+        return None
+
+    def chamfer_entities(
+        self, handle1: str, handle2: str, dist1: float = 0.0, dist2: float = 0.0
+    ) -> Optional[str]:
+        """
+        Chamfer/bevel two intersecting lines.
+
+        Args:
+            handle1: First entity handle
+            handle2: Second entity handle
+            dist1: First setback distance
+            dist2: Second setback distance
+
+        Returns:
+            Optional[str]: Handle of created chamfer line
+        """
+        return None
+
+    def explode_entity(self, handle: str) -> List[str]:
+        """
+        Explode a block reference or polyline into component primitives.
+
+        Args:
+            handle: Entity handle to explode
+
+        Returns:
+            List[str]: Handles of resulting primitive entities
+        """
+        return []
+
+    def match_properties(self, source_handle: str, target_handles: List[str]) -> bool:
+        """
+        Copy layer, color, linetype, and lineweight from source entity to targets.
+
+        Args:
+            source_handle: Template entity handle
+            target_handles: List of target entity handles
+
+        Returns:
+            bool: True if successful
+        """
+        return True
+
     # ========== Utility Methods ==========
+
 
     @staticmethod
     def normalize_coordinate(coord: Coordinate) -> Point:
