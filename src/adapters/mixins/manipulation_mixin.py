@@ -6,7 +6,7 @@ Handles entity manipulation operations (move, rotate, scale, copy, paste, arrays
 
 import logging
 import time
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, Any, TYPE_CHECKING
 
 from mcp_tools.constants import (
     SS_COPY,
@@ -562,3 +562,96 @@ class ManipulationMixin:
         except Exception as e:
             logger.error(f"Failed to create path array: {e}")
             return []
+
+    def offset_entity(
+        self, handle: str, distance: float, side_point: Optional[Any] = None
+    ) -> List[str]:
+        """Offset a line, arc, circle, or polyline by distance via COM."""
+        self._validate_connection()
+        document = self._get_document("offset_entity")
+        entity = document.HandleToObject(handle)
+        new_handles = []
+        try:
+            res = entity.Offset(distance)
+            if res:
+                if isinstance(res, (tuple, list)):
+                    for e in res:
+                        new_handles.append(str(e.Handle))
+                else:
+                    new_handles.append(str(res.Handle))
+            self.refresh_view()
+            return new_handles
+        except Exception as e:
+            logger.error(f"Failed to offset entity {handle}: {e}")
+            return []
+
+    def fillet_entities(
+        self, handle1: str, handle2: str, radius: float = 0.0
+    ) -> Optional[str]:
+        """Fillet two entities with radius via COM."""
+        self._validate_connection()
+        document = self._get_document("fillet_entities")
+        try:
+            cmd = f"_FILLET R {radius} (handent \"{handle1}\") (handent \"{handle2}\")\n"
+            document.SendCommand(cmd)
+            self.refresh_view()
+            return handle1
+        except Exception as e:
+            logger.error(f"Failed to fillet entities {handle1}, {handle2}: {e}")
+            return None
+
+    def chamfer_entities(
+        self, handle1: str, handle2: str, dist1: float = 0.0, dist2: float = 0.0
+    ) -> Optional[str]:
+        """Chamfer two entities with setback distances via COM."""
+        self._validate_connection()
+        document = self._get_document("chamfer_entities")
+        try:
+            cmd = f"_CHAMFER D {dist1} {dist2} (handent \"{handle1}\") (handent \"{handle2}\")\n"
+            document.SendCommand(cmd)
+            self.refresh_view()
+            return handle1
+        except Exception as e:
+            logger.error(f"Failed to chamfer entities {handle1}, {handle2}: {e}")
+            return None
+
+    def explode_entity(self, handle: str) -> List[str]:
+        """Explode a composite entity (block or polyline) into primitives via COM."""
+        self._validate_connection()
+        document = self._get_document("explode_entity")
+        entity = document.HandleToObject(handle)
+        new_handles = []
+        try:
+            exploded = entity.Explode()
+            if exploded:
+                for e in exploded:
+                    new_handles.append(str(e.Handle))
+            self.refresh_view()
+            return new_handles
+        except Exception as e:
+            logger.error(f"Failed to explode entity {handle}: {e}")
+            return []
+
+    def match_properties(self, source_handle: str, target_handles: List[str]) -> bool:
+        """Copy layer, color, linetype, and lineweight from source to target entities via COM."""
+        self._validate_connection()
+        document = self._get_document("match_properties")
+        source = document.HandleToObject(source_handle)
+        src_layer = source.Layer
+        src_color = source.Color
+        src_linetype = source.Linetype
+        src_weight = getattr(source, "Lineweight", 0)
+
+        for th in target_handles:
+            try:
+                target = document.HandleToObject(th)
+                target.Layer = src_layer
+                target.Color = src_color
+                target.Linetype = src_linetype
+                if hasattr(target, "Lineweight"):
+                    target.Lineweight = src_weight
+            except Exception as e:
+                logger.warning(f"Failed to match properties on {th}: {e}")
+        self.refresh_view()
+        return True
+
