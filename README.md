@@ -206,7 +206,7 @@ The dashboard provides a real-time view of the CAD state. You can manually refre
 - [**Architecture**](docs/02-ARCHITECTURE.md) - system design and extension guide.
 - [**Troubleshooting**](docs/04-TROUBLESHOOTING.md) - solutions for common issues.
 - [**Reference**](docs/05-REFERENCE.md) - complete MCP tool reference.
-- [**Changelog**](docs/07-CHANGELOG.md) - version history.
+- [**Changelog**](docs/03-CHANGELOG.md) - version history.
 
 ## Supported CAD Applications
 
