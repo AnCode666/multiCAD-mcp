@@ -377,6 +377,18 @@ class TestLayerOpShorthand:
         assert result["action"] == "is_on"
         assert result["name"] == "walls"
 
+    def test_template_default(self):
+        """Test layer template default."""
+        result = parse_layer_op_shorthand("template")
+        assert result["action"] == "template"
+        assert result["name"] == "aeco"
+
+    def test_template_explicit(self):
+        """Test layer template explicit."""
+        result = parse_layer_op_shorthand("template|aia")
+        assert result["action"] == "template"
+        assert result["name"] == "aia"
+
 
 class TestLayerOpsInput:
     """Tests for parse_layer_ops_input (multi-operation)."""
